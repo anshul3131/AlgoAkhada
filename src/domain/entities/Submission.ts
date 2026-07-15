@@ -11,7 +11,8 @@ export enum SubmissionStatus {
     TIME_LIMIT_EXCEEDED = "Time Limit Exceeded",
     COMPILATION_ERROR = "Compilation Error",
     RUNTIME_ERROR = "Runtime Error",
-    MEMORY_LIMIT_EXCEEDED = "Memory Limit Exceeded"
+    MEMORY_LIMIT_EXCEEDED = "Memory Limit Exceeded",
+    SUCCESS = "Success"
 }
 
 @Entity("submissions")
