@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-arena-backend-deployment
+  labels:
+    app: cp-arena-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cp-arena-backend
+  template:
+    metadata:
+      labels:
+        app: cp-arena-backend
+    spec:
+      containers:
+        - name: cp-arena-backend-container
+          image: cp-arena-backend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          
+          # Injecting the Kubernetes-native environment variables
+          env:
+            - name: KAFKA_BROKER
+              value: "cp-arena-kafka:9092"
+            - name: DB_HOST
+              value: "cp-postgres-postgresql"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              value: "postgres"
+            - name: DB_PASSWORD
+              value: "password123"
+            - name: DB_NAME
+              value: "cp_matchmaker_db"
+              
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
