@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from "typeorm";
 import { Problem } from "./Problem";
 import { User } from "./User";
 import { Language } from "../enums/CodeLanguage";
@@ -17,6 +17,7 @@ export enum SubmissionStatus {
 }
 
 @Entity("submissions")
+@Index('index_submission_status',['status'])
 export class Submission {
     @PrimaryGeneratedColumn("uuid")
     id: string;

@@ -171,17 +171,12 @@ class KafkaConsumerClient {
                     const activeMatch = await matchService.getActiveMatchForUser(userId);           
                     if (activeMatch) {                                                              
                         
-                        // Add/update entry in MatchHistory table for this submission
-                        let matchHistory = await matchHistoryRepository.findOne({
-                            where: { match: { id: activeMatch.id }, user: { id: userId } }
+                       
+                        let matchHistory = matchHistoryRepository.create({
+                            match: activeMatch,
+                            user: { id: userId } as any
                         });
                         
-                        if (!matchHistory) {
-                            matchHistory = matchHistoryRepository.create({
-                                match: activeMatch,
-                                user: { id: userId } as any
-                            });
-                        }
                         matchHistory.submission = { id: submissionId } as any;
                         await matchHistoryRepository.save(matchHistory);
 

@@ -8,7 +8,7 @@ import { ProblemDifficulty } from "../../domain/entities/Problem";
 
 
 @JsonController("/api/problems")
-// @Authorized()
+@Authorized()
 export class ProblemController {
 
     @Post()
