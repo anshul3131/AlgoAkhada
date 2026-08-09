@@ -11,7 +11,8 @@
     "migration:generate": "npm run typeorm -- migration:generate -d src/infrastructure/database/data_source.ts src/infrastructure/database/migrations/InitSchema",
     "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/database/data_source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/infrastructure/database/data_source.ts",
-    "script:seed": "npx tsx watch scripts/seedApps.ts"
+    "script:seed": "npx tsx watch scripts/seedApps.ts",
+    "script:addTag": "npx tsx watch scripts/tagProblems.ts"
   },
   "keywords": [],
   "author": "",

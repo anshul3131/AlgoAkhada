@@ -3,7 +3,7 @@ import { Badge } from '../../components/shared/Badge';
 import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { OdometerNumber } from '../../components/shared/OdometerNumber';
-import { matchApi } from '../../lib/api';
+import { matchApi, problemApi } from '../../lib/api';
 import type { Player, RecentMatchRecord } from '../../types';
 
 const mockPlayer: Player = {
@@ -18,6 +18,7 @@ const mockPlayer: Player = {
 export function LobbyDashboard({
   token,
   onFindMatch,
+  onExploreTags,
   username,
   elo,
   onLogout,
@@ -26,6 +27,7 @@ export function LobbyDashboard({
 }: {
   token: string;
   onFindMatch: () => void;
+  onExploreTags: () => void;
   username?: string;
   elo?: number;
   onLogout?: () => void;
@@ -33,7 +35,9 @@ export function LobbyDashboard({
   onUpsolve: (problemId: string) => void;
 }) {
   const [recentMatches, setRecentMatches] = useState<RecentMatchRecord[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentElo = elo ?? mockPlayer.elo;
   const rankProgress = useMemo(() => Math.min((currentElo / 2600) * 100, 100), [currentElo]);
@@ -108,7 +112,8 @@ export function LobbyDashboard({
               </button>
             ))}
           </div>
-          <Button className="h-[220px] w-full text-3xl" onClick={onFindMatch}>Find Match</Button>
+          <Button className="h-[220px] w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
+          <Button variant="ghost" className="w-full text-xs uppercase tracking-[0.2em]" onClick={onExploreTags}>Browse Topics</Button>
         </GlowPanel>
 
         <GlowPanel className="max-h-[480px] overflow-hidden">
@@ -174,6 +179,32 @@ export function LobbyDashboard({
                   </div>
                 );
               })
+            )}
+          </div>
+        </GlowPanel>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Topics</p>
+          <button onClick={onExploreTags} className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-primary hover:text-accent-primary/80">Open all</button>
+        </div>
+        <GlowPanel className="p-3">
+          <div className="flex flex-wrap gap-2">
+            {isLoadingTags ? (
+              <span className="text-sm text-text-secondary">Loading topics...</span>
+            ) : tags.length === 0 ? (
+              <span className="text-sm text-text-secondary">No topics available.</span>
+            ) : (
+              tags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={onExploreTags}
+                  className="rounded-full border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-primary transition hover:border-accent-primary hover:text-accent-primary"
+                >
+                  {tag}
+                </button>
+              ))
             )}
           </div>
         </GlowPanel>

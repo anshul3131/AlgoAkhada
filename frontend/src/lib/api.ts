@@ -1,4 +1,4 @@
-import type { RecentMatchRecord, SubmissionDetailRecord } from '../types';
+import type { ProblemListItem, RecentMatchRecord, SubmissionDetailRecord } from '../types';
 
 const API_BASE = (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ?? '/api';
 
@@ -42,6 +42,7 @@ export interface ProblemRecord {
   title: string;
   description?: string;
   difficulty?: string;
+  tags?: string[];
   timeLimit?: number;
   memoryLimit?: number;
 }
@@ -101,6 +102,17 @@ export const userApi = {
 };
 
 export const problemApi = {
+  getTags: (token: string) => request<{ tags: string[] }>('/problems/tags', {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+
+  getProblemsByTag: (token: string, tag: string, page = 1, limit = 20) => {
+    const query = new URLSearchParams({ tag, page: String(page), limit: String(limit) });
+    return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
   getProblem: (id: string, token: string) => request<ProblemRecord>(`/problems/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   }),

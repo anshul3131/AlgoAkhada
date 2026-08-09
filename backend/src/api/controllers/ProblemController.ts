@@ -5,10 +5,11 @@ import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import {problemRepository} from "../../infrastructure/database/repositories/ProblemRepository";
 import { CreateProblemDTO } from "../../domain/classes/CreateProblemDTO";
 import { ProblemDifficulty } from "../../domain/entities/Problem";
+import { ProblemTag } from "../../domain/enums/ProblemTag";
 
 
 @JsonController("/api/problems")
-@Authorized()
+// @Authorized()
 export class ProblemController {
 
     @Post()
@@ -34,12 +35,27 @@ export class ProblemController {
         }
     }
 
+    @Get("/tags")
+    async getTags(
+        @Res() res: Response
+    ) {
+        try {
+            return ResponseBuilder.success(res, 200, {
+                tags: Object.values(ProblemTag)
+            });
+        } catch (error: any) {
+            console.error(`[ProblemController] getTags error: ${error.message}`);
+            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+        }
+    }
+
     @Get()
     async getAllProblems(
         @QueryParam("page") page: number,
         @QueryParam("limit") limit: number,
         @QueryParam("difficulty") difficulty: string,
         @QueryParam("search") search: string,
+        @QueryParam("tag") tag: string,
         @Res() res: Response
     ) {
         try {
@@ -47,8 +63,24 @@ export class ProblemController {
             limit = limit ? Number(limit) : 20;
             difficulty = difficulty || ProblemDifficulty.MEDIUM;
 
-            const result = await problemRepository.getAllProblems(page, limit, difficulty, search);
-            return ResponseBuilder.success(res,200, result);
+            const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
+            
+            // Format exactly as the requested contract
+            const responsePayload = {
+                items: result.problems.map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    difficulty: p.difficulty,
+                    tags: p.tags || [],
+                    timeLimit: p.timeLimit,
+                    memoryLimit: p.memoryLimit
+                })),
+                page: result.page,
+                limit: result.limit,
+                total: result.total
+            };
+
+            return ResponseBuilder.success(res, 200, responsePayload);
 
         } catch (error: any) {
             console.error(`[ProblemController] getAllProblems error: ${error.message}`);

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
 import { TestCase } from "./TestCase";
 import { Submission } from "./Submission";
+import { ProblemTag } from "../enums/ProblemTag";
 
 // 1. Define the exact options allowed
 export enum ProblemDifficulty {
@@ -27,6 +28,14 @@ export class Problem {
         default: ProblemDifficulty.MEDIUM
     })
     difficulty: ProblemDifficulty;
+
+    @Column({
+        type: "enum",
+        enum: ProblemTag,
+        array: true,
+        default: []
+    })
+    tags: ProblemTag[];
 
     @Column("float", { default: 2.0 }) // Time limit in seconds
     timeLimit: number;

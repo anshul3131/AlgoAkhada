@@ -26,6 +26,26 @@ export interface Problem {
   sampleOutput: string;
 }
 
+export interface ProblemListItem {
+  id: string;
+  title: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  tags: string[];
+  timeLimit?: number;
+  memoryLimit?: number;
+}
+
+export interface ProblemTagListResponse {
+  tags: string[];
+}
+
+export interface ProblemListResponse {
+  items: ProblemListItem[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export interface RecentMatchRecord {
   matchId: string;
   opponentName: string;

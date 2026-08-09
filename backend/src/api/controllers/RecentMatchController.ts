@@ -2,6 +2,7 @@ import { JsonController, Get, QueryParam, Res, Authorized, Req } from "routing-c
 import { Response } from "express";
 import { recentMatchService } from "../../domain/services/RecentMatchService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
+import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
 
 @JsonController("/api/matches")
 @Authorized()
@@ -17,6 +18,11 @@ export class RecentMatchController {
         const userId = req.user.id;
 
         const serviceResponse = await recentMatchService.getRecentMatches(userId, limit, res);
-        res.status(serviceResponse.responseCode).send(serviceResponse.data)
+        if(serviceResponse.responseCode===RESPONSE_CODES.SUCCESS_HTTP_CODE){
+            res.status(serviceResponse.responseCode).send({success : true,data : serviceResponse.data})
+        }
+        else{
+            res.status(serviceResponse.responseCode).send({success : false,data : serviceResponse.data})
+        }
     }
 }

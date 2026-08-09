@@ -1,10 +1,21 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import "reflect-metadata";
+import { AppDataSource } from "../src/infrastructure/database/data_source";
+import { problemService } from "../src/domain/services/ProblemService";
 
-const API_URL = "http://localhost:3000/api/problems/bulk";
-const BATCH_SIZE = 5; // Process 5 problems per transaction
+const BATCH_SIZE = 30; // Process 10 problems per internal transaction
 
 async function seedAppsDirectory() {
+    try {
+        console.log("🔌 Initializing database connection...");
+        await AppDataSource.initialize();
+        console.log("✅ Database connected.");
+    } catch (error) {
+        console.error("❌ Failed to connect to database:", error);
+        return;
+    }
+
     // Point this to your APPS/test directory
     const baseDir = path.join(__dirname, "../data/APPS/test");
     console.log(`🚀 Scanning APPS directory at ${baseDir}...`);
@@ -57,37 +68,28 @@ async function seedAppsDirectory() {
 
         console.log(`📊 Successfully parsed ${dataset.length} problems. Batching by ${BATCH_SIZE}...`);
 
-        // 4. Send to the Bulk API in chunks
-        for (let i = 0; i < dataset.length; i += BATCH_SIZE) {
+        // 4. Call internal service directly in chunks
+        for (let i = 2780; i < dataset.length; i += BATCH_SIZE) {
             const batch = dataset.slice(i, i + BATCH_SIZE);
-            console.log(`\n📤 Sending batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} problems)...`);
+            console.log(`\n📤 Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(dataset.length / BATCH_SIZE)} (${batch.length} problems)...`);
             try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ dataset: batch})
-                });
+                const result = await problemService.bulkCreateProblems(batch);
+                
+                console.log(`✅ Batch successful! Added ${result.problemsAdded} problems and ${result.testCasesAdded} test cases.`);
 
-                const result = await response.json();
-
-                if (!response.ok) {
-                    console.error(`❌ Batch failed:`, result);
-                    continue;
-                }
-
-                console.log(`✅ Batch successful! Added ${result?.data?.stats?.problemsAdded} problems and ${result?.data?.stats?.testCasesAdded} test cases.`);
-
-                // Add a 500ms delay to prevent overwhelming the local Postgres connection pool
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Add a small delay to not overwhelm DB memory/CPU
+                await new Promise(resolve => setTimeout(resolve, 200));
             } catch (error) {
                 console.error(`❌ Unable to upload Batch:${Math.floor(i / BATCH_SIZE) + 1} `, error);
             }
         }
 
         console.log("\n🏁 All batches processed and seeded completely!");
+        process.exit(0);
 
     } catch (error) {
         console.error("❌ Fatal error reading directory:", error);
+        process.exit(1);
     }
 }
 

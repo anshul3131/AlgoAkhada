@@ -127,16 +127,19 @@ async function startServer(): Promise<void> {
                 console.log(`Socket ${socket.id} joined match room: ${matchRoom}`);
             });
 
-            socket.on('join_queue', async () => {
+            socket.on('join_queue', async (data?: { tag?: string }) => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;
                 
+                const tag = data?.tag;
+                
                 await kafkaProducerClient.sendMessage('matchmaking-requests', {
-                    userId: userId
+                    userId: userId,
+                    tag: tag
                 });
                 
                 socket.emit('queue_status', { status: 'waiting' });
-                console.log(`User ${userId} joined the queue.`);
+                console.log(`User ${userId} joined the queue${tag ? ` [${tag}]` : ''}.`);
             });
 
             socket.on('match_timeout', async (matchId: string) => {

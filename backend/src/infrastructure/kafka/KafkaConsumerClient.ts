@@ -242,13 +242,13 @@ class KafkaConsumerClient {
     }
 
     private async handleMatchmakingRequest(message: any) {
-        const { userId } = message;
+        const { userId, tag } = message;
         if (!userId) return;
 
         try {
             const user = await userRepository.getUserById(userId);
             if (user) {
-                await matchmakerService.addToQueue(user.id, user.elo_rating);
+                await matchmakerService.addToQueue(user.id, user.elo_rating, tag);
             } else {
                 console.warn(`⚠️ User not found for matchmaking request: ${userId}`);
             }

@@ -5,7 +5,7 @@ import type { RealtimeEventMap, RealtimeEventName } from '../types';
 interface RealtimeContextValue {
   connected: boolean;
   error: string | null;
-  joinQueue: () => void;
+  joinQueue: (payload?: { tag?: string }) => void;
   leaveQueue: () => void;
   joinMatch: (matchId: string) => void;
   finishMatchOnTimeout: (matchId: string) => void;
@@ -54,7 +54,14 @@ export function RealtimeProvider({ token, children }: { token: string | null; ch
   const value = useMemo<RealtimeContextValue>(() => ({
     connected,
     error,
-    joinQueue: () => socketRef.current?.emit('join_queue'),
+    joinQueue: (payload) => {
+      if (payload && Object.keys(payload).length > 0) {
+        socketRef.current?.emit('join_queue', payload);
+        return;
+      }
+
+      socketRef.current?.emit('join_queue');
+    },
     leaveQueue: () => socketRef.current?.emit('leave_queue'),
     joinMatch: (matchId) => socketRef.current?.emit('join_match', matchId),
     finishMatchOnTimeout: (matchId) => socketRef.current?.emit('match_timeout', matchId),

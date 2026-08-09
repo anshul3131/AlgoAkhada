@@ -3,6 +3,7 @@ import { Response } from "express";
 import { submissionService } from "../../domain/services/SubmissionService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import { SubmitCodeDTO } from "../../domain/classes/SubmitCodeDTO";
+import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
 
 
 @JsonController("/api/submissions")
@@ -59,6 +60,11 @@ export class SubmissionController {
         @Res() res: Response
     ) {
         const serviceResponse = await submissionService.getSubmissionById(submissionId);
-        return res.status(serviceResponse.responseCode).send(serviceResponse.data);
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data })
+        }
+        else {
+            res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data })
+        }
     }
 }

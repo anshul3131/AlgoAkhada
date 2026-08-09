@@ -18,7 +18,7 @@ export class ProblemRepository extends Repository<Problem> {
         return await this.findOne({ where: { id }, relations: { testCases: true } });
     }
 
-    async getAllProblems(page: number, limit: number, difficulty: string, search?: string) {
+    async getAllProblems(page: number, limit: number, difficulty: string, search?: string, tag?: string) {
         const query = this.createQueryBuilder("problem");
 
         // Format difficulty to match Enum (e.g., 'medium' -> 'Medium')
@@ -30,6 +30,11 @@ export class ProblemRepository extends Repository<Problem> {
         // Search by prefix if provided
         if (search) {
             query.andWhere("problem.title ILIKE :search", { search: `${search}%` });
+        }
+
+        // Filter by specific tag if provided
+        if (tag) {
+            query.andWhere(":tag = ANY(problem.tags)", { tag });
         }
 
         // Pagination
