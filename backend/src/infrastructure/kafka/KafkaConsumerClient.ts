@@ -14,6 +14,7 @@ import { User } from "../../domain/entities/User";
 import { matchService } from "../../domain/services/MatchService";
 import { userRepository } from "../database/repositories/UserRepository";
 import { matchHistoryRepository } from "../database/repositories/MatchHistoryRepository";
+import { SubmissionMode } from "../../domain/classes/SubmissionDTO";
 
 class KafkaConsumerClient {
     private consumer: Consumer;
@@ -129,7 +130,7 @@ class KafkaConsumerClient {
 
     private async handleCodeSubmission(message: any) {
         try {
-            const {language,problemId, code, submissionId,userId} = message;
+            const {language,problemId, code, submissionId,userId, mode} = message;
 
             const problem = await problemRepository.getProblemById(problemId);
             if (!problem) {
@@ -167,7 +168,7 @@ class KafkaConsumerClient {
             });
 
             // === Match Integration ===                                                        
-                if (userId) {                                                                       
+                if (userId && mode !== SubmissionMode.UPSOLVE) {                                                                       
                     const activeMatch = await matchService.getActiveMatchForUser(userId);           
                     if (activeMatch) {                                                              
                         

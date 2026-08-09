@@ -1,4 +1,4 @@
-import { JsonController, Post, Body, Res, Authorized, Req } from "routing-controllers";
+import { JsonController, Post, Get, Param, Body, Res, Authorized, Req } from "routing-controllers";
 import { Response } from "express";
 import { submissionService } from "../../domain/services/SubmissionService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
@@ -20,7 +20,7 @@ export class SubmissionController {
             console.log(userId);
             
             // Destructure the payload safely
-            const { problemId, language, code } = body;
+            const { problemId, language, code, mode } = body;
 
             // Validate all required fields are present
             if (!problemId || !language || !code) {
@@ -28,7 +28,7 @@ export class SubmissionController {
             }
 
             // Execute the transaction and queue the job in Kafka
-            const submission = await submissionService.createSubmission(userId, problemId, language, code);
+            const submission = await submissionService.createSubmission(userId, problemId, language, code, mode);
             
             // Exclude the raw code from the response payload to keep the network response lightweight
             const responseData = {
@@ -51,5 +51,14 @@ export class SubmissionController {
             
             return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
         }
+    }
+
+    @Get("/:submissionId")
+    async getSubmission(
+        @Param("submissionId") submissionId: string,
+        @Res() res: Response
+    ) {
+        const serviceResponse = await submissionService.getSubmissionById(submissionId);
+        return res.status(serviceResponse.responseCode).send(serviceResponse.data);
     }
 }

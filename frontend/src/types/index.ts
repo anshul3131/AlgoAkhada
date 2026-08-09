@@ -26,6 +26,25 @@ export interface Problem {
   sampleOutput: string;
 }
 
+export interface RecentMatchRecord {
+  matchId: string;
+  opponentName: string;
+  problemId: string;
+  problemTitle: string;
+  result: 'WIN' | 'LOSE';
+  action: 'VIEW_SOLUTION' | 'UPSOLVE';
+  submissionId: string | null;
+  submittedAt: string | null;
+}
+
+export interface SubmissionDetailRecord {
+  submissionId: string;
+  problemId: string;
+  language: string;
+  code: string;
+  status: string;
+}
+
 export interface TestCaseResult {
   id: string;
   name: string;

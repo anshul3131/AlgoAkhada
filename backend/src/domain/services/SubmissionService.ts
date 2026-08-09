@@ -5,9 +5,11 @@ import { problemRepository } from "../../infrastructure/database/repositories/Pr
 import { kafkaProducerClient } from "../../infrastructure/kafka/KafkaProducerClient";
 import { Language } from "../enums/CodeLanguage";
 import { AppDataSource } from "../../infrastructure/database/data_source";
+import { RESPONSE_CODES, RESPONSE_MESSAGES, ResponseData } from "../classes/ResponseDTO";
+import { SubmissionDTO } from "../classes/SubmissionDTO";
 
 export class SubmissionService {
-    async createSubmission(userId: string, problemId: string, language: Language, code: string): Promise<Submission> {
+    async createSubmission(userId: string, problemId: string, language: Language, code: string, mode: 'match' | 'upsolve' = 'match'): Promise<Submission> {
         // 1. Validate relations exist in the database
         const user = await userRepository.getUserById(userId);
         if (!user) throw new Error("USER_NOT_FOUND");
@@ -37,7 +39,8 @@ export class SubmissionService {
                 language, 
                 code, 
                 problemId: problem.id,
-                userId: user.id
+                userId: user.id,
+                mode
             };
             
             await kafkaProducerClient.sendMessage("code-submissions", kafkaPayload);
@@ -54,6 +57,36 @@ export class SubmissionService {
         } finally {
             // Release the connection back to the pool
             await queryRunner.release();
+        }
+    }
+
+    async getSubmissionById(submissionId: string): Promise<ResponseData> {
+        try {
+            if (!submissionId) {
+                return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT);
+            }
+
+            const submission = await submissionRepository.findOne({
+                where: { id: submissionId },
+                relations: {problem : true}
+            });
+
+            if (!submission) {
+                return ResponseData.build(RESPONSE_CODES.NOT_AVAILABLE, RESPONSE_MESSAGES.NOT_FOUND);
+            }
+
+            const data: SubmissionDTO = {
+                submissionId: submission.id,
+                problemId: submission.problem ? submission.problem.id : "",
+                language: submission.language,
+                code: submission.code,
+                status: submission.status
+            };
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
+        } catch (error: any) {
+            console.error(`[SubmissionService] getSubmissionById error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 }

@@ -1,3 +1,5 @@
+import type { RecentMatchRecord, SubmissionDetailRecord } from '../types';
+
 const API_BASE = (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ?? '/api';
 
 export interface AuthUser {
@@ -53,13 +55,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as ApiEnvelope<T> | T) : null;
 
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.ERROR_MSG ?? `Request failed: ${response.status}`);
+  if (!response.ok) {
+    const errorMessage = typeof payload === 'object' && payload && 'ERROR_MSG' in payload
+      ? (payload as ApiEnvelope<T>).ERROR_MSG
+      : (typeof payload === 'object' && payload && 'message' in payload ? (payload as { message?: string }).message : undefined);
+    throw new Error(errorMessage ?? `Request failed: ${response.status}`);
   }
 
-  return payload.data as T;
+  if (payload && typeof payload === 'object' && 'success' in payload) {
+    const wrapped = payload as ApiEnvelope<T>;
+    if (wrapped.success === false) {
+      throw new Error(wrapped.ERROR_MSG ?? 'Request failed');
+    }
+    return (wrapped.data ?? (undefined as T)) as T;
+  }
+
+  return payload as T;
 }
 
 export const authApi = {
@@ -92,15 +106,28 @@ export const problemApi = {
   }),
 };
 
+export const matchApi = {
+  getRecentMatches: (token: string, limit = 10) =>
+    request<RecentMatchRecord[]>(`/matches/recent?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+};
+
 export const submissionApi = {
+  getSubmission: (token: string, submissionId: string) =>
+    request<SubmissionDetailRecord>(`/submissions/${submissionId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
   submitCode: (token: string, payload: {
     userId: string;
     problemId: string;
     language: string;
     code: string;
-  }) => {
-    const requestPayload = { ...payload };
-    if (import.meta.env?.DEV) {
+    mode?: 'match' | 'upsolve';
+  }, mode: 'match' | 'upsolve' = 'match') => {
+    const requestPayload = { ...payload, mode: payload.mode ?? mode };
+    if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
       console.debug('[submission] POST /api/submissions', requestPayload);
     }
 
