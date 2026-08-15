@@ -17,6 +17,15 @@ export class User {
     @Column({type : "varchar"})
     password : string;
 
+    @Column({ type: "varchar", nullable: true })
+    refresh_token: string | null;
+
+    @Column({ type: "varchar", nullable: true })
+    last_login_ip: string | null;
+
+    @Column({ type: "varchar", nullable: true })
+    last_login_device: string | null;
+
     @CreateDateColumn()
     created_at: Date;
 }

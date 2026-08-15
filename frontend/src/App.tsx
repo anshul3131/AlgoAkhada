@@ -14,7 +14,7 @@ import type { AuthUser } from './lib/api';
 type Screen = 'lobby' | 'queue' | 'battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer';
 type MatchContext = { matchId: string; problemId: string };
 
-function ArenaShell({ token, user, logout }: { token: string; user: AuthUser; logout: () => void }) {
+function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
   const [screen, setScreen] = useState<Screen>('lobby');
   const [match, setMatch] = useState<MatchContext | null>(null);
   const [result, setResult] = useState<'VICTORY' | 'DEFEAT'>('VICTORY');
@@ -52,7 +52,6 @@ function ArenaShell({ token, user, logout }: { token: string; user: AuthUser; lo
     <main className="min-h-screen bg-bg-void text-text-primary">
       {screen === 'lobby' && (
         <LobbyDashboard
-          token={token}
           username={user.username}
           elo={elo}
           onFindMatch={enterQueue}
@@ -63,12 +62,11 @@ function ArenaShell({ token, user, logout }: { token: string; user: AuthUser; lo
         />
       )}
       {screen === 'queue' && <MatchmakingQueue tag={queueTag} onCancel={() => setScreen('lobby')} onMatchFound={onMatchFound} />}
-      {screen === 'battle' && match && <Battleground token={token} userId={user.id} matchId={match.matchId} problemId={match.problemId} onFinished={onFinished} />}
+      {screen === 'battle' && match && <Battleground userId={user.id} matchId={match.matchId} problemId={match.problemId} onFinished={onFinished} />}
       {screen === 'aftermath' && <AftermathScreen result={result} elo={elo} onRematch={enterQueue} onLobby={() => setScreen('lobby')} />}
-      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen token={token} submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} />}
+      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} />}
       {screen === 'tag-explorer' && (
         <TagExplorerScreen
-          token={token}
           onBackToLobby={() => setScreen('lobby')}
           onSolveProblem={(problemId) => {
             setPracticeProblemId(problemId);
@@ -79,7 +77,6 @@ function ArenaShell({ token, user, logout }: { token: string; user: AuthUser; lo
       )}
       {screen === 'upsolve' && practiceProblemId && (
         <PracticeScreen
-          token={token}
           userId={user.id}
           problemId={practiceProblemId}
           mode="upsolve"
@@ -93,9 +90,9 @@ function ArenaShell({ token, user, logout }: { token: string; user: AuthUser; lo
 export default function App() {
   const auth = useAuth();
 
-  if (!auth.token || !auth.user) {
+  if (!auth.user) {
     return <AuthScreen onAuthenticated={() => undefined} login={auth.login} signup={auth.signup} isLoading={auth.isLoading} error={auth.error} />;
   }
 
-  return <RealtimeProvider token={auth.token}><ArenaShell token={auth.token} user={auth.user} logout={auth.logout} /></RealtimeProvider>;
+  return <RealtimeProvider><ArenaShell user={auth.user} logout={auth.logout} /></RealtimeProvider>;
 }

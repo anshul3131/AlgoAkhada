@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { authApi, type AuthUser } from '../lib/api';
 
-const TOKEN_KEY = 'cp_arena_token';
 const USER_KEY = 'cp_arena_user';
 
 function readUser(): AuthUser | null {
@@ -10,20 +9,42 @@ function readUser(): AuthUser | null {
 }
 
 export function useAuth() {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<AuthUser | null>(() => readUser());
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  }, [token]);
+    // try to refresh session on mount
+    let mounted = true;
+    (async () => {
+      try {
+        // Try to refresh tokens (server sets cookies). We don't expect user data from /refresh.
+        await authApi.refresh();
+        if (!mounted) return;
+        // If refresh succeeded, fetch current user profile.
+        try {
+          const me = await (await import('../lib/api')).userApi.me();
+          if (!mounted) return;
+          localStorage.setItem(USER_KEY, JSON.stringify(me));
+          setUser(me);
+        } catch (meErr) {
+          // can't fetch user -> treat as logged out
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
+        }
+      } catch (e) {
+        localStorage.removeItem(USER_KEY);
+        setUser(null);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    })();
 
-  const finishAuth = useCallback((result: { user: AuthUser; token: string }) => {
-    localStorage.setItem(TOKEN_KEY, result.token);
+    return () => { mounted = false; };
+  }, []);
+
+  const finishAuth = useCallback((result: { user: AuthUser }) => {
     localStorage.setItem(USER_KEY, JSON.stringify(result.user));
-    setToken(result.token);
     setUser(result.user);
     return result;
   }, []);
@@ -32,7 +53,8 @@ export function useAuth() {
     setIsLoading(true);
     setError(null);
     try {
-      return finishAuth(await authApi.login(email, password));
+      const resp = await authApi.login(email, password);
+      return finishAuth({ user: resp.user });
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unable to login';
       setError(message);
@@ -46,7 +68,8 @@ export function useAuth() {
     setIsLoading(true);
     setError(null);
     try {
-      return finishAuth(await authApi.signup(email, password, username));
+      const resp = await authApi.signup(email, password, username);
+      return finishAuth({ user: resp.user });
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unable to create account';
       setError(message);
@@ -56,14 +79,17 @@ export function useAuth() {
     }
   }, [finishAuth]);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // ignore
+    }
     localStorage.removeItem(USER_KEY);
-    setToken(null);
     setUser(null);
   }, []);
 
-  return { token, user, isLoading, error, login, signup, logout };
+  return { user, isLoading, error, login, signup, logout };
 }
 
-export { TOKEN_KEY };
+export { USER_KEY };

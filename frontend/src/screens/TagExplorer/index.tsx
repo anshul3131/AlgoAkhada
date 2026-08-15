@@ -5,8 +5,7 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import { problemApi } from '../../lib/api';
 import type { ProblemListItem } from '../../types';
 
-export function TagExplorerScreen({ token, onBackToLobby, onSolveProblem, onFindMatch }: {
-  token: string;
+export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }: {
   onBackToLobby: () => void;
   onSolveProblem: (problemId: string) => void;
   onFindMatch: (tag: string) => void;
@@ -24,7 +23,7 @@ export function TagExplorerScreen({ token, onBackToLobby, onSolveProblem, onFind
       setError(null);
 
       try {
-        const response = await problemApi.getTags(token);
+        const response = await problemApi.getTags();
         const nextTags = response.tags ?? [];
         setTags(nextTags);
         if (!selectedTag && nextTags.length > 0) {
@@ -38,7 +37,7 @@ export function TagExplorerScreen({ token, onBackToLobby, onSolveProblem, onFind
     };
 
     void loadTags();
-  }, [selectedTag, token]);
+  }, [selectedTag]);
 
   useEffect(() => {
     const loadProblems = async () => {
@@ -48,7 +47,7 @@ export function TagExplorerScreen({ token, onBackToLobby, onSolveProblem, onFind
       setError(null);
 
       try {
-        const response = await problemApi.getProblemsByTag(token, selectedTag, 1, 20);
+        const response = await problemApi.getProblemsByTag(selectedTag, 1, 20);
         setProblems(response.items ?? []);
       } catch (caughtError) {
         setError((caughtError as Error).message);
@@ -58,7 +57,7 @@ export function TagExplorerScreen({ token, onBackToLobby, onSolveProblem, onFind
     };
 
     void loadProblems();
-  }, [selectedTag, token]);
+  }, [selectedTag]);
 
   const difficultyTone = useMemo(() => ({
     Easy: 'text-accent-primary',

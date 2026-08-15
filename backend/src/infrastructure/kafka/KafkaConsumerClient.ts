@@ -53,11 +53,10 @@ class KafkaConsumerClient {
         this.consumer = kafka.consumer({
             groupId: 'cp-arena-consumer', // Keep whatever your group ID is
 
-            // 1. Increase session timeout to 2 minutes (120,000 ms). 
-            sessionTimeout: 120000,
+            // Decrease session timeout to 30 seconds so ghost consumers are kicked out faster
+            sessionTimeout: 30000,
 
-            // 2. Adjust the heartbeat interval so it pings Kafka more reliably 
-            // to let it know the worker is still alive.
+            // Heartbeat interval pings Kafka to let it know the worker is still alive
             heartbeatInterval: 10000,
         });
     }

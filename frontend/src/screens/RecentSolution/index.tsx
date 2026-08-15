@@ -5,7 +5,7 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import { submissionApi } from '../../lib/api';
 import type { SubmissionDetailRecord } from '../../types';
 
-export function RecentSolutionScreen({ token, submissionId, onBack }: { token: string; submissionId: string; onBack: () => void }) {
+export function RecentSolutionScreen({ submissionId, onBack }: { submissionId: string; onBack: () => void }) {
   const [submission, setSubmission] = useState<SubmissionDetailRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function RecentSolutionScreen({ token, submissionId, onBack }: { token: s
       setError(null);
 
       try {
-        const nextSubmission = await submissionApi.getSubmission(token, submissionId);
+        const nextSubmission = await submissionApi.getSubmission(submissionId);
         setSubmission(nextSubmission);
       } catch (caughtError) {
         setError((caughtError as Error).message);
@@ -26,7 +26,7 @@ export function RecentSolutionScreen({ token, submissionId, onBack }: { token: s
     };
 
     void loadSubmission();
-  }, [submissionId, token]);
+  }, [submissionId]);
 
   return (
     <main className="mx-auto max-w-[1400px] p-4 md:p-6">

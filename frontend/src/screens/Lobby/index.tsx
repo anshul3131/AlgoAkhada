@@ -16,7 +16,6 @@ const mockPlayer: Player = {
 };
 
 export function LobbyDashboard({
-  token,
   onFindMatch,
   onExploreTags,
   username,
@@ -25,7 +24,6 @@ export function LobbyDashboard({
   onReviewSolution,
   onUpsolve,
 }: {
-  token: string;
   onFindMatch: () => void;
   onExploreTags: () => void;
   username?: string;
@@ -50,7 +48,7 @@ export function LobbyDashboard({
       setError(null);
 
       try {
-        const matches = await matchApi.getRecentMatches(token, 5);
+        const matches = await matchApi.getRecentMatches(5);
         if (!isCancelled) {
           setRecentMatches(matches);
         }
@@ -70,7 +68,7 @@ export function LobbyDashboard({
     return () => {
       isCancelled = true;
     };
-  }, [token]);
+  }, []);
 
   return (
     <div className="mx-auto max-w-[1400px] p-4 md:p-6">

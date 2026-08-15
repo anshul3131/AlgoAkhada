@@ -20,6 +20,7 @@ export const RESPONSE_MESSAGES = {
     SOMETHING_WENT_WRONG : 'Something went wrong. Please contact support.',
     TEST_CONFIG_FAILED : 'Please use the valid phone number or Try with another base phone number',
     AUTHORIZATION_FAILED: 'api token not valid',
+    THEFT_OCCUR : "Security Alert: Invalid token. Account secured and logged out.",
     DUPLICATE_DEVICE: 'duplicate device, a device can only be used with two different mobile number',
     DUPLICATE_COLUMN: 'is already used by another user',
     LOGIN_OTP_LIMIT_REACHED : 'OTP limit reached',

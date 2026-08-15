@@ -18,13 +18,11 @@ int main() {
 }`;
 
 export function PracticeScreen({
-  token,
   userId,
   problemId,
   mode,
   onBack,
 }: {
-  token: string;
   userId: string;
   problemId: string;
   mode: 'upsolve';
@@ -41,10 +39,10 @@ export function PracticeScreen({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void problemApi.getProblem(problemId, token)
+    void problemApi.getProblem(problemId)
       .then(setProblem)
       .catch((caughtError) => setError((caughtError as Error).message));
-  }, [problemId, token]);
+  }, [problemId]);
 
   useEffect(() => {
     if (submissionId) {
@@ -70,7 +68,7 @@ export function PracticeScreen({
     setError(null);
 
     try {
-      const submission = await submissionApi.submitCode(token, { userId, problemId, language, code }, mode);
+      const submission = await submissionApi.submitCode({ userId, problemId, language, code }, mode);
       setSubmissionId(submission.id);
       setVerdict('Running against hidden tests');
     } catch (caughtError) {

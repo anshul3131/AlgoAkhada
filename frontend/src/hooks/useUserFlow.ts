@@ -23,12 +23,12 @@ export function useUserFlow() {
     }
   }, []);
 
-  const submitCode = useCallback(async (token: string, payload: { userId: string; problemId: string; language: string; code: string }) => {
+  const submitCode = useCallback(async (payload: { userId: string; problemId: string; language: string; code: string }) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      return await submissionApi.submitCode(token, payload);
+      return await submissionApi.submitCode(payload);
     } catch (caughtError) {
       setError((caughtError as Error).message);
       throw caughtError;

@@ -17,21 +17,14 @@ interface RealtimeContextValue {
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 const SOCKET_URL = (import.meta as ImportMeta & { env?: { VITE_SOCKET_URL?: string } }).env?.VITE_SOCKET_URL ?? 'http://localhost:3000';
 
-export function RealtimeProvider({ token, children }: { token: string | null; children: ReactNode }) {
+export function RealtimeProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   const listenersRef = useRef<Partial<Record<RealtimeEventName, Array<(payload: never) => void>>>>({});
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-      setConnected(false);
-      return;
-    }
-
-    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'] });
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], withCredentials: true });
     socketRef.current = socket;
     socket.on('connect', () => { setConnected(true); setError(null); });
     socket.on('disconnect', () => setConnected(false));
@@ -49,7 +42,7 @@ export function RealtimeProvider({ token, children }: { token: string | null; ch
       socketRef.current = null;
       setConnected(false);
     };
-  }, [token]);
+  }, []);
 
   const value = useMemo<RealtimeContextValue>(() => ({
     connected,

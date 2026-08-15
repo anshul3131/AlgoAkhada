@@ -8,10 +8,10 @@ import { useCountdownTimer } from '../../hooks/useCountdownTimer';
 import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimeProvider';
 import { problemApi, submissionApi, type ProblemRecord } from '../../lib/api';
 
-interface BattlegroundProps { token: string; userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
+interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
 const initialCode = `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // your solution\n    return 0;\n}`;
 
-export function Battleground({ token, userId, matchId, problemId, onFinished }: BattlegroundProps) {
+export function Battleground({ userId, matchId, problemId, onFinished }: BattlegroundProps) {
   const { joinMatch, subscribeToSubmission, finishMatchOnTimeout } = useRealtimeContext();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
   const [language, setLanguage] = useState('C++');
@@ -26,8 +26,8 @@ export function Battleground({ token, userId, matchId, problemId, onFinished }: 
 
   useEffect(() => {
     joinMatch(matchId);
-    void problemApi.getProblem(problemId, token).then(setProblem).catch((caughtError) => setError((caughtError as Error).message));
-  }, [joinMatch, matchId, problemId, token]);
+    void problemApi.getProblem(problemId).then(setProblem).catch((caughtError) => setError((caughtError as Error).message));
+  }, [joinMatch, matchId, problemId]);
 
   useEffect(() => { if (submissionId) subscribeToSubmission(submissionId); }, [submissionId, subscribeToSubmission]);
 
@@ -57,7 +57,7 @@ export function Battleground({ token, userId, matchId, problemId, onFinished }: 
     setVerdict('Queued for evaluation');
     setError(null);
     try {
-      const submission = await submissionApi.submitCode(token, { userId, problemId, language, code });
+      const submission = await submissionApi.submitCode({ userId, problemId, language, code });
       setSubmissionId(submission.id);
       setVerdict('Running against hidden tests');
     } catch (caughtError) {

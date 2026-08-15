@@ -5,7 +5,7 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import type { AuthUser } from '../../lib/api';
 
 interface AuthScreenProps {
-  onAuthenticated: (user: AuthUser, token: string) => void;
+  onAuthenticated?: (user: AuthUser) => void;
   login: (email: string, password: string) => Promise<unknown>;
   signup: (email: string, password: string, username: string) => Promise<unknown>;
   isLoading: boolean;
@@ -23,8 +23,8 @@ export function AuthScreen({ onAuthenticated, login, signup, isLoading, error }:
     const result = mode === 'login'
       ? await login(email, password)
       : await signup(email, password, username);
-    const authenticated = result as { user: AuthUser; token: string };
-    onAuthenticated(authenticated.user, authenticated.token);
+    const authenticated = result as { user: AuthUser };
+    onAuthenticated?.(authenticated.user);
   };
 
   return (

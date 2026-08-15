@@ -1,4 +1,5 @@
 import express, { Application } from "express";
+import cookieParser from "cookie-parser";
 import { useExpressServer } from "routing-controllers";
 import { SubmissionController } from "./api/controllers/SubmissionController";
 import { ProblemController } from "./api/controllers/ProblemController";
@@ -10,6 +11,7 @@ import { Action } from "routing-controllers";
 
 // Initialize the Express Application
 const app: Application = express();
+app.use(cookieParser());
 
 // Register Controllers using routing-controllers
 useExpressServer(app, {
@@ -18,13 +20,19 @@ useExpressServer(app, {
 
     // 1. Add the Authorization Checker
     authorizationChecker: async (action: Action, roles: string[]) => {
-        // Look for the header: "Authorization: Bearer <token>"
-        const authHeader = action.request.headers['authorization'];
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return false; // Blocks the request (sends a 401 Unauthorized)
+        // Look for token in cookies first, then fallback to header
+        let token = action.request.cookies?.accessToken;
+        
+        if (!token) {
+            const authHeader = action.request.headers['authorization'];
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                token = authHeader.split(' ')[1];
+            }
         }
 
-        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return false;
+        }
 
         try {
             // Verify the token signature
@@ -41,6 +49,24 @@ useExpressServer(app, {
     },
 
     defaultErrorHandler: false 
+});
+
+// Global error handler to provide JSON responses for routing-controllers errors
+app.use((err: any, req: any, res: any, next: any) => {
+    if (res.headersSent) {
+        return next(err);
+    }
+
+    // If the error is an authorization/unauthorized type, return 401
+    const msg = String(err?.message ?? '');
+    const name = String(err?.name ?? '');
+    if (name.toLowerCase().includes('unauthor') || msg.toLowerCase().includes('authorization') || msg.toLowerCase().includes('authentication')) {
+        return res.status(401).send({ success: false, ERROR_MSG: 'Unauthorized' });
+    }
+
+    // Fallback: return generic failure JSON
+    console.error('Unhandled error in global handler:', err);
+    return res.status(500).send({ success: false, ERROR_MSG: 'Internal server error' });
 });
 
 // We only export the app; we DO NOT call app.listen() here

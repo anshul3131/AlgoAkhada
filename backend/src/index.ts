@@ -28,7 +28,10 @@ async function startServer(): Promise<void> {
             try {
                 // Safely disconnect Kafka with a timeout guard
                 await Promise.race([
-                    kafkaProducerClient.gracefulShutdown(),
+                    Promise.all([
+                        kafkaProducerClient.gracefulShutdown(),
+                        kafkaConsumerClient.gracefulShutdown()
+                    ]),
                     new Promise((_, reject) => setTimeout(() => reject(new Error("Kafka disconnect timeout")), 4000))
                 ]);
             } catch (err: any) {
@@ -89,7 +92,19 @@ async function startServer(): Promise<void> {
         });
 
         io.use((socket, next) => {
-            const token = socket.handshake.auth?.token || socket.handshake.headers['authorization']?.split(' ')[1];
+            // Because we switched to HttpOnly cookies, the token is now in the 'cookie' header!
+            // We need to parse the raw cookie string to find the 'accessToken'.
+            let token = socket.handshake.auth?.token || socket.handshake.headers['authorization']?.split(' ')[1];
+            
+            // If not found in auth/header, check the cookies!
+            if (!token && socket.handshake.headers.cookie) {
+                const cookies = socket.handshake.headers.cookie.split(';');
+                const accessTokenCookie = cookies.find(c => c.trim().startsWith('accessToken='));
+                if (accessTokenCookie) {
+                    token = accessTokenCookie.split('=')[1];
+                }
+            }
+
             if (!token) {
                 return next(new Error('Authentication error: Token missing'));
             }

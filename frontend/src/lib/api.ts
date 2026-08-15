@@ -47,34 +47,60 @@ export interface ProblemRecord {
   memoryLimit?: number;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
+async function request<T>(path: string, init?: RequestInit, allowRefresh = true): Promise<T> {
+  const doFetch = async () => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    });
 
-  const text = await response.text();
-  const payload = text ? (JSON.parse(text) as ApiEnvelope<T> | T) : null;
+    const text = await response.text();
+    const payload = text ? (JSON.parse(text) as ApiEnvelope<T> | T) : null;
 
-  if (!response.ok) {
-    const errorMessage = typeof payload === 'object' && payload && 'ERROR_MSG' in payload
-      ? (payload as ApiEnvelope<T>).ERROR_MSG
-      : (typeof payload === 'object' && payload && 'message' in payload ? (payload as { message?: string }).message : undefined);
-    throw new Error(errorMessage ?? `Request failed: ${response.status}`);
-  }
-
-  if (payload && typeof payload === 'object' && 'success' in payload) {
-    const wrapped = payload as ApiEnvelope<T>;
-    if (wrapped.success === false) {
-      throw new Error(wrapped.ERROR_MSG ?? 'Request failed');
+    if (!response.ok) {
+      const errorMessage = typeof payload === 'object' && payload && 'ERROR_MSG' in payload
+        ? (payload as ApiEnvelope<T>).ERROR_MSG
+        : (typeof payload === 'object' && payload && 'message' in payload ? (payload as { message?: string }).message : undefined);
+      const err = new Error(errorMessage ?? `Request failed: ${response.status}`);
+      (err as any).status = response.status;
+      throw err;
     }
-    return (wrapped.data ?? (undefined as T)) as T;
-  }
 
-  return payload as T;
+    if (payload && typeof payload === 'object' && 'success' in payload) {
+      const wrapped = payload as ApiEnvelope<T>;
+      if (wrapped.success === false) {
+        throw new Error(wrapped.ERROR_MSG ?? 'Request failed');
+      }
+      return (wrapped.data ?? (undefined as T)) as T;
+    }
+
+    return payload as T;
+  };
+
+  try {
+    return await doFetch();
+  } catch (err) {
+    const e = err as any;
+    if (allowRefresh && (e?.status === 401 || e?.message?.toLowerCase().includes('unauthorized'))) {
+      try {
+        const refreshResp = await fetch(`${API_BASE}/users/refresh`, { method: 'POST', credentials: 'include' });
+        if (!refreshResp.ok) {
+          await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
+          throw new Error('Session expired');
+        }
+
+        return await request<T>(path, init, false);
+      } catch (refreshErr) {
+        throw refreshErr;
+      }
+    }
+
+    throw err;
+  }
 }
 
 export const authApi = {
@@ -89,6 +115,10 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  refresh: () => request<void>('/users/refresh', { method: 'POST' }),
+  logout: async () => {
+    await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include' });
+  },
 };
 
 export const userApi = {
@@ -99,39 +129,28 @@ export const userApi = {
     }),
 
   getUser: (id: string) => request<UserRecord>(`/users/${id}`),
+  me: () => request<AuthUser>('/users/me'),
 };
 
 export const problemApi = {
-  getTags: (token: string) => request<{ tags: string[] }>('/problems/tags', {
-    headers: { Authorization: `Bearer ${token}` },
-  }),
+  getTags: () => request<{ tags: string[] }>('/problems/tags'),
 
-  getProblemsByTag: (token: string, tag: string, page = 1, limit = 20) => {
+  getProblemsByTag: (tag: string, page = 1, limit = 20) => {
     const query = new URLSearchParams({ tag, page: String(page), limit: String(limit) });
-    return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`);
   },
 
-  getProblem: (id: string, token: string) => request<ProblemRecord>(`/problems/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }),
+  getProblem: (id: string) => request<ProblemRecord>(`/problems/${id}`),
 };
 
 export const matchApi = {
-  getRecentMatches: (token: string, limit = 10) =>
-    request<RecentMatchRecord[]>(`/matches/recent?limit=${limit}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+  getRecentMatches: (limit = 10) => request<RecentMatchRecord[]>(`/matches/recent?limit=${limit}`),
 };
 
 export const submissionApi = {
-  getSubmission: (token: string, submissionId: string) =>
-    request<SubmissionDetailRecord>(`/submissions/${submissionId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+  getSubmission: (submissionId: string) => request<SubmissionDetailRecord>(`/submissions/${submissionId}`),
 
-  submitCode: (token: string, payload: {
+  submitCode: (payload: {
     userId: string;
     problemId: string;
     language: string;
@@ -145,7 +164,6 @@ export const submissionApi = {
 
     return request<SubmissionRecord>('/submissions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(requestPayload),
     });
   },
