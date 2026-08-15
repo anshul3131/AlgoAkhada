@@ -9,6 +9,7 @@ interface RealtimeContextValue {
   leaveQueue: () => void;
   joinMatch: (matchId: string) => void;
   finishMatchOnTimeout: (matchId: string) => void;
+  forfeitMatch: (matchId: string) => void;
   subscribeToSubmission: (submissionId: string) => void;
   emit: <K extends RealtimeEventName>(eventName: K, payload: RealtimeEventMap[K]) => void;
   subscribe: <K extends RealtimeEventName>(eventName: K, handler: (payload: RealtimeEventMap[K]) => void) => () => void;
@@ -58,6 +59,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     leaveQueue: () => socketRef.current?.emit('leave_queue'),
     joinMatch: (matchId) => socketRef.current?.emit('join_match', matchId),
     finishMatchOnTimeout: (matchId) => socketRef.current?.emit('match_timeout', matchId),
+    forfeitMatch: (matchId) => socketRef.current?.emit('forfeit_match', matchId),
     subscribeToSubmission: (submissionId) => socketRef.current?.emit('subscribeToSubmission', submissionId),
     emit: (eventName, payload) => socketRef.current?.emit(eventName, payload),
     subscribe: (eventName, handler) => {

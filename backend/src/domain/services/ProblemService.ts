@@ -1,24 +1,114 @@
 import { Problem, ProblemDifficulty } from "../entities/Problem";
-import { problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
+import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
+import { submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
 import { AppDataSource } from "../../infrastructure/database/data_source";
 import { TestCase } from "../entities/TestCase";
+import { ProblemTag } from "../enums/ProblemTag";
+import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
+import { ProblemDetailDTO, ProblemListResponseDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
+import { ProblemFormatter } from "../../utils/ProblemFormatter";
 
 export class ProblemService {
     
-    async createProblem(title: string, description: string,difficulty?: ProblemDifficulty, timeLimit?: number, memoryLimit?: number): Promise<Problem> {
-        // TypeORM's create() builds the object in memory with entity defaults
-        const problemData = new Problem();
-        problemData.title = title;
-        problemData.description = description;
-        problemData.difficulty = difficulty || ProblemDifficulty.MEDIUM; 
-        problemData.timeLimit = timeLimit || 2;
-        problemData.memoryLimit = memoryLimit || 256;
-        
-        return await problemRepository.saveEntity(problemData);
+    async createProblem(title: string, description: string,difficulty?: ProblemDifficulty, timeLimit?: number, memoryLimit?: number): Promise<ResponseData> {
+        try {
+            const problemData = new Problem();
+            problemData.title = title;
+            problemData.description = description;
+            problemData.difficulty = difficulty || ProblemDifficulty.MEDIUM; 
+            problemData.timeLimit = timeLimit || 2;
+            problemData.memoryLimit = memoryLimit || 256;
+            
+            const saved = await problemRepository.saveEntity(problemData);
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, "Problem Created Successfuly", saved);
+        } catch (error: any) {
+            console.error(`[ProblemService] createProblem error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
     }
 
-    public async bulkCreateProblems(dataset: any[]): Promise<{ problemsAdded: number; testCasesAdded: number }> {
-        // Start a Database Transaction
+    async getTags(): Promise<ResponseData> {
+        try {
+            const data: TagsResponseDTO = { tags: Object.values(ProblemTag) };
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
+        } catch (error: any) {
+            console.error(`[ProblemService] getTags error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string): Promise<ResponseData> {
+        try {
+            page = page ? Number(page) : 1;
+            limit = limit ? Number(limit) : 20;
+            difficulty = difficulty || ProblemDifficulty.MEDIUM;
+
+            const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
+            
+            const responsePayload: ProblemListResponseDTO = {
+                items: result.problems.map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    difficulty: p.difficulty,
+                    tags: p.tags || [],
+                    timeLimit: p.timeLimit,
+                    memoryLimit: p.memoryLimit
+                })),
+                page: result.page,
+                limit: result.limit,
+                total: result.total
+            };
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, responsePayload);
+        } catch (error: any) {
+            console.error(`[ProblemService] getAllProblems error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    async getProblemDetails(id: string, userId?: string): Promise<ResponseData> {
+        try {
+            const problem = await problemRepository.getProblemById(id);
+            if (!problem) {
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, "Problem not found");
+            }
+
+            const samples : ProblemSampleDTO[] = (problem.testCases || [])
+                .filter(tc => !tc.isHidden)
+                .map(tc => ({
+                    id: tc.id,
+                    name: tc.name || "Example",
+                    input: tc.input,
+                    output: tc.expectedOutput,
+                    explanation: tc.explanation || ""
+                }));
+
+            const payload: ProblemDetailDTO = {
+                id: problem.id,
+                title: problem.title,
+                description: ProblemFormatter.formatCodeforces(problem.description),
+                timeLimit: problem.timeLimit,
+                memoryLimit: problem.memoryLimit,
+                difficulty: problem.difficulty,
+                tags: problem.tags || [],
+                samples: samples
+            };
+
+            if (userId) {
+                const sub = await submissionRepository.getLastAcceptedSubmission(id, userId);
+                if (sub) {
+                    payload.lastSubmission = { code: sub.code, language: sub.language };
+                }
+            }
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
+        } catch (error: any) {
+            console.error(`[ProblemService] getProblemDetails error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    public async bulkCreateProblems(dataset: any[]): Promise<ResponseData> {
         const queryRunner = AppDataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
@@ -28,46 +118,37 @@ export class ProblemService {
             let testCasesAdded = 0;
 
             for (const item of dataset) {
-                // 1. Create the Problem
                 const problem = new Problem();
                 problem.title = item.title;
                 problem.description = item.description;
-                problem.difficulty = item?.difficulty || ProblemDifficulty.MEDIUM; // Default to MEDIUM if not provided
-                // Add your defaults from the DTO logic here if needed
+                problem.difficulty = item?.difficulty || ProblemDifficulty.MEDIUM;
                 problem.timeLimit = item.timeLimit || 2;
                 problem.memoryLimit = item.memoryLimit || 256;
                 
                 const savedProblem = await queryRunner.manager.save(problem);
                 problemsAdded++;
 
-                // 2. Create and link the Test Cases
                 if (item.testCases && Array.isArray(item.testCases)) {
                     const testCases = item.testCases.map((tc: any) => {
                         const testCase = new TestCase();
                         testCase.input = tc.input;
                         testCase.expectedOutput = tc.expectedOutput;
                         testCase.isHidden = tc.isHidden !== undefined ? tc.isHidden : true;
-                        testCase.problem = savedProblem; // Link to the parent problem
+                        testCase.problem = savedProblem;
                         return testCase;
                     });
-
                     await queryRunner.manager.save(TestCase, testCases);
                     testCasesAdded += testCases.length;
                 }
             }
 
-            // Commit the transaction only if ALL problems and test cases succeed
             await queryRunner.commitTransaction();
-
-            return { problemsAdded, testCasesAdded };
-
-        } catch (error) {
-            // If anything fails, rollback the entire batch to prevent data corruption
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, "Dataset ingested successfully!", { problemsAdded, testCasesAdded });
+        } catch (error: any) {
             await queryRunner.rollbackTransaction();
             console.error("❌ Bulk upload transaction failed. Rolling back...", error);
-            throw error; // Throw so the controller catches it and sends a 500
+            return ResponseData.build(RESPONSE_CODES.FAILURE, "Failed to ingest dataset. Transaction rolled back.");
         } finally {
-            // Always release the connection back to the pool
             await queryRunner.release();
         }
     }

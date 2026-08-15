@@ -45,6 +45,11 @@ export interface ProblemRecord {
   tags?: string[];
   timeLimit?: number;
   memoryLimit?: number;
+  samples?: { id: string; input: string; output: string; explanation?: string; }[];
+  lastSubmission?: {
+    code: string;
+    language: string;
+  };
 }
 
 async function request<T>(path: string, init?: RequestInit, allowRefresh = true): Promise<T> {
@@ -168,3 +173,39 @@ export const submissionApi = {
     });
   },
 };
+
+export interface LanguageRecord {
+  id: string;
+  name: string;
+  fileExtension: string;
+}
+
+export interface ExecutionResponse {
+  status: string;
+  aggregated: { passed: number; total: number; };
+  testCaseResults?: {
+    testCaseId: string;
+    input: string;
+    output: string;
+    expectedOutput: string;
+    status: string;
+    executionTimeMs: number;
+  }[];
+}
+
+export const executionApi = {
+  getLanguages: () => request<LanguageRecord[]>('/languages'),
+  executeCode: (payload: {
+    problemId?: string;
+    language: string;
+    code: string;
+    runMode: 'samples' | 'custom';
+    sampleIds?: string[];
+    inputs?: string[];
+    timeoutMs?: number;
+  }) => request<ExecutionResponse>('/execute', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+

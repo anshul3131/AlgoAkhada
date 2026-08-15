@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiStatus } from '../../components/shared/ApiStatus';
 import { Badge } from '../../components/shared/Badge';
-import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { Timer } from '../../components/shared/Timer';
 import { useCountdownTimer } from '../../hooks/useCountdownTimer';
 import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimeProvider';
-import { problemApi, submissionApi, type ProblemRecord } from '../../lib/api';
+import { problemApi, submissionApi, executionApi, type ProblemRecord, type LanguageRecord } from '../../lib/api';
+import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
 
 interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
-const initialCode = `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // your solution\n    return 0;\n}`;
 
 export function Battleground({ userId, matchId, problemId, onFinished }: BattlegroundProps) {
-  const { joinMatch, subscribeToSubmission, finishMatchOnTimeout } = useRealtimeContext();
+  const { joinMatch, subscribeToSubmission, finishMatchOnTimeout, forfeitMatch } = useRealtimeContext();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
-  const [language, setLanguage] = useState('C++');
-  const [code, setCode] = useState(initialCode);
-  const [activeTab, setActiveTab] = useState<'output' | 'tests' | 'opponent'>('output');
+  const [languages, setLanguages] = useState<LanguageRecord[]>([]);
+  
+  const [activeTab, setActiveTab] = useState<'output' | 'tests' | 'opponent'>('tests');
   const [opponentStatus, setOpponentStatus] = useState('Watching the arena');
   const [verdict, setVerdict] = useState('Ready to submit');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -27,6 +26,7 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
   useEffect(() => {
     joinMatch(matchId);
     void problemApi.getProblem(problemId).then(setProblem).catch((caughtError) => setError((caughtError as Error).message));
+    void executionApi.getLanguages().then(setLanguages).catch(console.error);
   }, [joinMatch, matchId, problemId]);
 
   useEffect(() => { if (submissionId) subscribeToSubmission(submissionId); }, [submissionId, subscribeToSubmission]);
@@ -34,10 +34,14 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
   useRealtimeEvent('opponent_status', (payload) => {
     if (payload.matchId === matchId && payload.userId !== userId) setOpponentStatus(payload.status.status);
   });
-  useRealtimeEvent('evaluation_complete', (payload) => {
+  useRealtimeEvent('evaluation_complete', (payload: any) => {
     if (payload.submissionId === submissionId) {
       setIsSubmitting(false);
       setVerdict(`${payload.status} · ${payload.passed}/${payload.total} tests`);
+      if (payload.compileError) {
+        setError(payload.compileError);
+      }
+      setActiveTab('output');
     }
   });
   useRealtimeEvent('match_result', (payload) => {
@@ -52,10 +56,11 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
 
   const { remaining, pressureLevel } = useCountdownTimer(420, handleTimeout);
 
-  const submit = async () => {
+  const submit = async (language: string, code: string) => {
     setIsSubmitting(true);
     setVerdict('Queued for evaluation');
     setError(null);
+    setActiveTab('output');
     try {
       const submission = await submissionApi.submitCode({ userId, problemId, language, code });
       setSubmissionId(submission.id);
@@ -71,29 +76,48 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3"><Badge label="LIVE MATCH" tone="danger" /><span className="font-mono text-sm text-text-secondary">match/{matchId.slice(0, 8)}</span></div>
         <Timer value={remaining} pressure={pressureLevel} className="text-4xl" />
-        <Badge label={`Opponent: ${opponentStatus}`} tone="primary" />
+        <div className="flex items-center gap-4">
+          <Badge label={`Opponent: ${opponentStatus}`} tone="primary" />
+          <button 
+            onClick={() => {
+              if (window.confirm("Are you sure you want to forfeit this match? Your opponent will win.")) {
+                forfeitMatch(matchId);
+              }
+            }}
+            className="rounded bg-accent-danger/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-danger transition-colors hover:bg-accent-danger hover:text-white"
+          >
+            Forfeit Match
+          </button>
+        </div>
       </GlowPanel>
 
       <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <GlowPanel className="space-y-5 xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
           <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
-          <div><h1 className="text-2xl font-semibold">{problem?.title ?? 'Loading problem...'}</h1><p className="mt-4 text-sm leading-7 text-text-secondary">{problem?.description ?? 'Fetching the problem assigned to this match.'}</p></div>
+          <div>
+            <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
+            <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
+          </div>
           <div className="border-t border-border-hairline pt-4"><p className="mb-3 text-xs uppercase tracking-[0.2em] text-text-secondary">Match brief</p><div className="grid grid-cols-2 gap-2"><ApiStatus label="Time" value={`${problem?.timeLimit ?? 2}s`} /><ApiStatus label="Memory" value={`${problem?.memoryLimit ?? 256}MB`} /></div></div>
         </GlowPanel>
 
-        <div className="space-y-4">
-          <GlowPanel className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2"><select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-sm text-text-primary"><option>C++</option><option>PYTHON</option></select><Badge label={isSubmitting ? 'Evaluating' : 'Draft saved locally'} tone={isSubmitting ? 'warn' : 'primary'} /></div>
-            <div className="flex gap-2"><Button variant="ghost" onClick={() => setVerdict('Sample tests queued')} disabled={isTimingOut}>Run Samples</Button><Button variant="danger" onClick={submit} disabled={isSubmitting || isTimingOut}>{isTimingOut ? 'Resolving...' : isSubmitting ? 'Submitting...' : 'Submit Solution'}</Button></div>
-          </GlowPanel>
-          <GlowPanel className="p-2"><textarea value={code} onChange={(event) => setCode(event.target.value)} spellCheck={false} className="min-h-[390px] w-full resize-y rounded-lg bg-black p-5 font-mono text-sm leading-7 text-text-mono outline-none focus:ring-1 focus:ring-accent-primary" /></GlowPanel>
-          <GlowPanel>
-            <div className="mb-4 flex gap-2">{(['output', 'tests', 'opponent'] as const).map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${activeTab === tab ? 'border-accent-primary text-accent-primary' : 'border-border-hairline text-text-secondary'}`}>{tab}</button>)}</div>
-            {activeTab === 'output' && <div className="font-mono text-sm"><span className={verdict.includes('Accepted') ? 'text-accent-primary' : 'text-text-secondary'}>{verdict}</span>{error && <p className="mt-2 text-accent-danger">{error}</p>}</div>}
-            {activeTab === 'tests' && <div className="space-y-2 font-mono text-sm text-text-secondary"><div className="rounded-lg border border-border-hairline p-3">Visible tests <span className="float-right text-accent-primary">Ready</span></div><div className="rounded-lg border border-border-hairline p-3">Hidden tests <span className="float-right text-accent-warn">Server-side</span></div></div>}
-            {activeTab === 'opponent' && <div className="font-mono text-sm text-text-secondary">Opponent status: <span className="text-accent-primary">{opponentStatus}</span></div>}
-          </GlowPanel>
-        </div>
+        <CodeWorkspace 
+          problemId={problemId}
+          problem={problem}
+          languages={languages}
+          isSubmitting={isSubmitting}
+          isTimingOut={isTimingOut}
+          submitLabel="Submit Solution"
+          onSubmit={submit}
+          verdict={verdict}
+          setVerdict={setVerdict}
+          error={error}
+          setError={setError}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          showOpponentTab={true}
+          opponentStatus={opponentStatus}
+        />
       </div>
     </main>
   );

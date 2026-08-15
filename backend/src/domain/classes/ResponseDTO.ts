@@ -210,5 +210,6 @@ export const RESPONSE_CODES = {
     NOT_AVAILABLE : 404,
     ALREADY_EXISTS : 409,
     NOT_MODIFIED : 304,
+    NOT_FOUND: 404,
 }
 

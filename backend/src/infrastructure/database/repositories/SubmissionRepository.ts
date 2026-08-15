@@ -23,6 +23,13 @@ export class SubmissionRepository extends Repository<Submission> {
         submission.status = status;
         return await repo.save(submission);
     }
+
+    async getLastAcceptedSubmission(problemId: string, userId: string) {
+        return await this.findOne({
+            where: { problem: { id: problemId }, user: { id: userId }, status: SubmissionStatus.ACCEPTED },
+            order: { submittedAt: "DESC" } as any
+        });
+    }
 }
 
 export const submissionRepository = new SubmissionRepository();

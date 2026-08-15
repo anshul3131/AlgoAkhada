@@ -4,18 +4,8 @@ import { Badge } from '../../components/shared/Badge';
 import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimeProvider';
-import { problemApi, submissionApi, type ProblemRecord } from '../../lib/api';
-
-const initialCode = `#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-
-    // solve the problem here
-    return 0;
-}`;
+import { problemApi, submissionApi, executionApi, type ProblemRecord, type LanguageRecord } from '../../lib/api';
+import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
 
 export function PracticeScreen({
   userId,
@@ -30,42 +20,53 @@ export function PracticeScreen({
 }) {
   const { subscribeToSubmission } = useRealtimeContext();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
-  const [language, setLanguage] = useState('C++');
-  const [code, setCode] = useState(initialCode);
+  const [languages, setLanguages] = useState<LanguageRecord[]>([]);
+  
+  const [activeTab, setActiveTab] = useState<'output' | 'tests' | 'opponent'>('tests');
   const [verdict, setVerdict] = useState('Ready to submit');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [initialCode, setInitialCode] = useState<string | null>(null);
+  const [initialLanguage, setInitialLanguage] = useState<string | null>(null);
+
   useEffect(() => {
-    void problemApi.getProblem(problemId)
-      .then(setProblem)
-      .catch((caughtError) => setError((caughtError as Error).message));
+    void problemApi.getProblem(problemId).then((res) => {
+        setProblem(res);
+        if (res.lastSubmission) {
+            setInitialCode(res.lastSubmission.code);
+            setInitialLanguage(res.lastSubmission.language);
+        }
+    }).catch((caughtError) => setError((caughtError as Error).message));
+    void executionApi.getLanguages().then(setLanguages).catch(console.error);
   }, [problemId]);
 
   useEffect(() => {
-    if (submissionId) {
-      subscribeToSubmission(submissionId);
-    }
+    if (submissionId) subscribeToSubmission(submissionId);
   }, [submissionId, subscribeToSubmission]);
 
-  useRealtimeEvent('evaluation_complete', (payload) => {
+  useRealtimeEvent('evaluation_complete', (payload: any) => {
     if (payload.submissionId === submissionId) {
       setIsSubmitting(false);
-      const nextVerdict = `${payload.status} · ${payload.passed}/${payload.total} tests`;
-      setVerdict(nextVerdict);
+      setVerdict(`${payload.status} · ${payload.passed}/${payload.total} tests`);
+      if (payload.compileError) {
+        setError(payload.compileError);
+      }
+      setActiveTab('output');
       if (payload.status === 'Accepted') {
         setShowSuccess(true);
       }
     }
   });
 
-  const submit = async () => {
+  const submit = async (language: string, code: string) => {
     setShowSuccess(false);
     setIsSubmitting(true);
     setVerdict('Queued for upsolve');
     setError(null);
+    setActiveTab('output');
 
     try {
       const submission = await submissionApi.submitCode({ userId, problemId, language, code }, mode);
@@ -111,8 +112,8 @@ export function PracticeScreen({
           </div>
 
           <div>
-            <h1 className="text-2xl font-semibold">{problem?.title ?? 'Loading problem...'}</h1>
-            <p className="mt-4 text-sm leading-7 text-text-secondary">{problem?.description ?? 'Fetching the upsolve problem details.'}</p>
+            <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
+            <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the upsolve problem details.' }}></div>
           </div>
 
           <div className="border-t border-border-hairline pt-4">
@@ -124,46 +125,23 @@ export function PracticeScreen({
           </div>
         </GlowPanel>
 
-        <div className="space-y-4">
-          <GlowPanel className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <select
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-                className="rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-sm text-text-primary"
-              >
-                <option>C++</option>
-                <option>PYTHON</option>
-              </select>
-              <Badge label="Practice mode" tone="primary" />
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setVerdict('Sample tests queued')}>Run samples</Button>
-              <Button variant="primary" onClick={submit} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit solution'}
-              </Button>
-            </div>
-          </GlowPanel>
-
-          <GlowPanel className="p-2">
-            <textarea
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              spellCheck={false}
-              className="min-h-[390px] w-full resize-y rounded-lg bg-black p-5 font-mono text-sm leading-7 text-text-mono outline-none focus:ring-1 focus:ring-accent-primary"
-            />
-          </GlowPanel>
-
-          <GlowPanel>
-            <div className="space-y-2 font-mono text-sm text-text-secondary">
-              <div className="rounded-lg border border-border-hairline p-3">
-                <span className={verdict.includes('Accepted') || verdict.includes('Queued') || verdict.includes('Running') ? 'text-accent-primary' : 'text-text-secondary'}>{verdict}</span>
-                {error && <p className="mt-2 text-accent-danger">{error}</p>}
-              </div>
-            </div>
-          </GlowPanel>
-        </div>
+        <CodeWorkspace 
+          problemId={problemId}
+          problem={problem}
+          languages={languages}
+          isSubmitting={isSubmitting}
+          submitLabel="Submit solution"
+          onSubmit={submit}
+          verdict={verdict}
+          setVerdict={setVerdict}
+          error={error}
+          setError={setError}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          showOpponentTab={false}
+          initialCode={initialCode}
+          initialLanguage={initialLanguage}
+        />
       </div>
     </main>
   );

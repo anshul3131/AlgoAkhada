@@ -1,15 +1,11 @@
-import { JsonController, Post, Get, Body, Param, QueryParam, Res, Authorized } from "routing-controllers";
+import { JsonController, Post, Get, Body, Param, QueryParam, Res, Req, Authorized } from "routing-controllers";
 import { Response } from "express";
 import { problemService } from "../../domain/services/ProblemService";
-import { ResponseBuilder } from "../../utils/ResponseBuilder";
-import {problemRepository} from "../../infrastructure/database/repositories/ProblemRepository";
 import { CreateProblemDTO } from "../../domain/classes/CreateProblemDTO";
-import { ProblemDifficulty } from "../../domain/entities/Problem";
-import { ProblemTag } from "../../domain/enums/ProblemTag";
-
+import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
 
 @JsonController("/api/problems")
-// @Authorized()
+@Authorized()
 export class ProblemController {
 
     @Post()
@@ -17,35 +13,27 @@ export class ProblemController {
         @Body() body: CreateProblemDTO,
         @Res() res: Response
     ) {
-        try {
-            // Destructure safely from the typed DTO
-            const { title, description,difficulty, timeLimit, memoryLimit } = body;
+        const { title, description, difficulty, timeLimit, memoryLimit } = body;
+        
+        if (!title || !description) {
+            return res.status(400).send({ success: false, data: "Missing required fields" });
+        }
 
-            // Basic validation
-            if (!title || !description) {
-                return ResponseBuilder.error(res, "INVALID_INPUT", "Missing required fields", 400);
-            }
-
-            const problem = await problemService.createProblem(title, description,difficulty, timeLimit, memoryLimit);
-            return ResponseBuilder.success(res,200, problem,"Problem Created Successfuly");
-
-        } catch (error: any) {
-            console.error(`[ProblemController] createProblem error: ${error.message}`);
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+        const serviceResponse = await problemService.createProblem(title, description, difficulty, timeLimit, memoryLimit);
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 
     @Get("/tags")
-    async getTags(
-        @Res() res: Response
-    ) {
-        try {
-            return ResponseBuilder.success(res, 200, {
-                tags: Object.values(ProblemTag)
-            });
-        } catch (error: any) {
-            console.error(`[ProblemController] getTags error: ${error.message}`);
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+    async getTags(@Res() res: Response) {
+        const serviceResponse = await problemService.getTags();
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 
@@ -58,80 +46,45 @@ export class ProblemController {
         @QueryParam("tag") tag: string,
         @Res() res: Response
     ) {
-        try {
-            page = page ? Number(page) : 1;
-            limit = limit ? Number(limit) : 20;
-            difficulty = difficulty || ProblemDifficulty.MEDIUM;
-
-            const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
-            
-            // Format exactly as the requested contract
-            const responsePayload = {
-                items: result.problems.map(p => ({
-                    id: p.id,
-                    title: p.title,
-                    difficulty: p.difficulty,
-                    tags: p.tags || [],
-                    timeLimit: p.timeLimit,
-                    memoryLimit: p.memoryLimit
-                })),
-                page: result.page,
-                limit: result.limit,
-                total: result.total
-            };
-
-            return ResponseBuilder.success(res, 200, responsePayload);
-
-        } catch (error: any) {
-            console.error(`[ProblemController] getAllProblems error: ${error.message}`);
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+        const serviceResponse = await problemService.getAllProblems(page, limit, difficulty, search, tag);
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 
     @Get("/:id")
     async getProblem(
         @Param("id") id: string,
+        @Req() req: any,
         @Res() res: Response
     ) {
-        try {
-            const problem = await problemRepository.getProblemById(id);
-            return ResponseBuilder.success(res,200, problem);
-
-        } catch (error: any) {
-            console.error(`[ProblemController] getProblem error: ${error.message}`);
-
-            if (error.message === "PROBLEM_NOT_FOUND") {
-                return ResponseBuilder.error(res, "NOT_FOUND", "Problem not found", 404);
-            }
-
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+        const userId = req.user?.id;
+        const serviceResponse = await problemService.getProblemDetails(id, userId);
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 
     @Post("/bulk")
     async bulkUpload(
-        @Body() body: { dataset: any[] }, // Accept the dataset array from the request
+        @Body() body: { dataset: any[] },
         @Res() res: Response
     ) {
-        try {
-            const { dataset } = body;
-            console.log("Received dataset for bulk upload:", dataset);
+        const { dataset } = body;
+        
+        if (!dataset || !Array.isArray(dataset)) {
+            return res.status(400).send({ success: false, data: "Invalid payload. Expected a 'dataset' array." });
+        }
 
-            // Validate payload structure
-            if (!dataset || !Array.isArray(dataset)) {
-                return ResponseBuilder.error(res, "INVALID_INPUT", "Invalid payload. Expected a 'dataset' array.", 400);
-            }
-
-            // Delegate the heavy database transaction to the service layer
-            const stats = await problemService.bulkCreateProblems(dataset);
-            return ResponseBuilder.success(res,201, {
-                message: "Dataset ingested successfully!",
-                stats
-            });
-
-        } catch (error: any) {
-            console.error(`[ProblemController] bulkUpload error: ${error.message}`);
-            return ResponseBuilder.error(res, "FAILURE", "Failed to ingest dataset. Transaction rolled back.", 500);
+        const serviceResponse = await problemService.bulkCreateProblems(dataset);
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(201).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 }

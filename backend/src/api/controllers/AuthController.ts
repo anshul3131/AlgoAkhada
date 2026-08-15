@@ -11,7 +11,8 @@ export class AuthController {
     @Post('/signup')
     public async signUp(@Req() req: any, @Body() body: SignUpRequestDTO, @Res() res: Response) {
         if (!body.email || !body.password || !body.username) {
-            return res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            return res;
         }
 
         body.ipAddress = req.ip || req.connection.remoteAddress;
@@ -31,7 +32,8 @@ export class AuthController {
     @Post('/login')
     public async login(@Req() req: any, @Body() body: LoginRequestDTO, @Res() res: Response) {
         if (!body.email || !body.password) {
-            return res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            return res;
         }
 
         body.ipAddress = req.ip || req.connection.remoteAddress;
@@ -53,7 +55,8 @@ export class AuthController {
         // Read refresh token from cookie or body
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         if (!refreshToken) {
-            return res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            return res;
         }
 
         const ipAddress = req.ip || req.connection.remoteAddress;
@@ -63,9 +66,11 @@ export class AuthController {
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
             res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 15 * 60 * 1000 });
             res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            return res;
         } else {
-            return res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: serviceResponse.responseMessage });
+            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: serviceResponse.responseMessage });
+            return res;
         }
     }
 
@@ -80,9 +85,11 @@ export class AuthController {
         res.clearCookie('refreshToken');
         
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            return res;
         } else {
-            return res.status(RESPONSE_CODES.FAILURE).send({ success: false, data: serviceResponse.responseMessage });
+            res.status(RESPONSE_CODES.FAILURE).send({ success: false, data: serviceResponse.responseMessage });
+            return res;
         }
     }
 
@@ -91,12 +98,14 @@ export class AuthController {
     public async me(@Req() req: any, @Res() res: Response) {
         const userId = req.user?.id;
         if (!userId) {
-            return res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.UNAUTHORIZED });
+            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.UNAUTHORIZED });
+            return res;
         }
 
         const user = await userRepository.getUserById(userId);
         if (!user) {
-            return res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.USER_NOT_FOUND });
+            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.USER_NOT_FOUND });
+            return res;
         }
 
         const payload = {
@@ -107,21 +116,25 @@ export class AuthController {
             created_at: user.created_at,
         };
 
-        return res.status(RESPONSE_CODES.SUCCESS_HTTP_CODE).send({ success: true, data: payload });
+        res.status(RESPONSE_CODES.SUCCESS_HTTP_CODE).send({ success: true, data: payload });
+        return res;
     }
 
     @Post('/generateToken')
     public async getTestToken(@Body() body: any, @Res() res: Response){
         if (!body.email) {
-            return res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
+            return res;
         }
 
         const serviceResponse = await authService.generateTestToken(body.email);
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+            return res;
         } else {
             const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
-            return res.status(statusCode).send({ success: false, data: serviceResponse.responseMessage });
+            res.status(statusCode).send({ success: false, data: serviceResponse.responseMessage });
+            return res;
         }
     }
 }

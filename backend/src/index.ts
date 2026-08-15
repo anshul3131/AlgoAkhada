@@ -164,6 +164,13 @@ async function startServer(): Promise<void> {
                 await matchService.finishMatchByTimeout(matchId, userId);
             });
 
+            socket.on('forfeit_match', async (matchId: string) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !matchId) return;
+
+                await matchService.finishMatchByTimeout(matchId, userId);
+            });
+
             socket.on('leave_queue', async () => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;

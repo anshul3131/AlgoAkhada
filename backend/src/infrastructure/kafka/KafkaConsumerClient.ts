@@ -9,8 +9,6 @@ import { ExecutionResult } from "../../domain/interfaces/CodeExecutor";
 import { Language } from "../../domain/enums/CodeLanguage";
 import { pythonExecutor } from "../../domain/services/PythonExecutorService";
 import { matchmakerService } from "../../domain/services/MatchmakerService";
-import { AppDataSource } from "../database/data_source";
-import { User } from "../../domain/entities/User";
 import { matchService } from "../../domain/services/MatchService";
 import { userRepository } from "../database/repositories/UserRepository";
 import { matchHistoryRepository } from "../database/repositories/MatchHistoryRepository";
@@ -163,7 +161,8 @@ class KafkaConsumerClient {
                 submissionId: submissionId,
                 status: response.status,
                 passed: response.passed,
-                total: response.total
+                total: response.total,
+                compileError: response.compileError
             });
 
             // === Match Integration ===                                                        
@@ -184,7 +183,8 @@ class KafkaConsumerClient {
                         await matchService.updateOpponentStatus(activeMatch.id, userId, {           
                             status: response.status,                                                
                             passed: response.passed,                                                
-                            total: response.total
+                            total: response.total,
+                            compileError: response.compileError
                         });
     
                         // If the user solved it, they win the match!

@@ -15,6 +15,12 @@ export class TestCase {
     @Column("boolean",{ default: true }) // True for hidden test cases used during grading
     isHidden: boolean;
 
+    @Column({ type: "varchar", nullable: true })
+    name: string | null;
+
+    @Column({ type: "text", nullable: true })
+    explanation: string | null;
+
     @ManyToOne(() => Problem, (problem) => problem.testCases, { onDelete: "CASCADE" })
     @JoinColumn({ name: "problem_id" })
     problem: Problem;
