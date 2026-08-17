@@ -12,6 +12,8 @@ import { matchmakerService } from "../../domain/services/MatchmakerService";
 import { matchService } from "../../domain/services/MatchService";
 import { userRepository } from "../database/repositories/UserRepository";
 import { matchHistoryRepository } from "../database/repositories/MatchHistoryRepository";
+import { customMatchRepository } from "../database/repositories/CustomMatchRepository";
+import { customMatchParticipantRepository } from "../database/repositories/CustomMatchParticipantRepository";
 import { SubmissionMode } from "../../domain/classes/SubmissionDTO";
 
 class KafkaConsumerClient {
@@ -166,7 +168,37 @@ class KafkaConsumerClient {
             });
 
             // === Match Integration ===                                                        
-                if (userId && mode !== SubmissionMode.UPSOLVE) {                                                                       
+            if (userId && mode === SubmissionMode.CUSTOM) {
+                const { matchId } = message;
+                const match = await customMatchRepository.getMatchById(matchId);
+                if (match) {
+                    let score = 0;
+                    if (response.status === SubmissionStatus.ACCEPTED) {
+                        const timeTakenMs = Date.now() - match.created_at.getTime();
+                        const totalTimeMs = match.timeLimit * 60 * 1000;
+                        score = Math.max(10, Math.floor(((totalTimeMs - timeTakenMs) / totalTimeMs) * 1000));
+                    }
+                    
+                    const participant = match.participants?.find(p => p.user.id === userId);
+                    if (participant) {
+                        if (score > (participant.score || 0)) {
+                            participant.score = score;
+                            await customMatchParticipantRepository.saveEntity(participant);
+                        }
+                    }
+
+                    appEvents.emit('custom_submission_graded', {
+                        lobbyId: matchId,
+                        userId: userId,
+                        username: participant?.user?.username || 'Unknown',
+                        status: response.status,
+                        score: participant ? participant.score : 0,
+                        passed: response.passed,
+                        total: response.total,
+                        compileError: response.compileError
+                    });
+                }
+            } else if (userId && mode !== SubmissionMode.UPSOLVE) {                                                                       
                     const activeMatch = await matchService.getActiveMatchForUser(userId);           
                     if (activeMatch) {                                                              
                         

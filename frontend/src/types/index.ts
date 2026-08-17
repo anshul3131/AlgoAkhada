@@ -87,6 +87,15 @@ export interface RealtimeEventMap {
   elo_update: { userId: string; newElo: number };
   match_result: { matchId: string; winnerId: string; loserId: string };
   evaluation_complete: { submissionId: string; status: string; passed: number; total: number };
+  custom_lobby_invite_received: { lobbyId: string; inviterUsername: string; inviterId: string };
+  custom_lobby_updated: { id: string; topic: string; timeLimit: number; maxParticipants: number; hostId: string; participants: any[] };
+  custom_lobby_joined: { id: string; topic: string; timeLimit: number; maxParticipants: number; hostId: string; participants: any[] };
+  custom_match_started: { id: string; problemId: string };
+  custom_lobby_declined: { lobbyId: string; declinerId: string };
+  custom_lobby_left: { lobbyId: string; userId: string };
+  custom_match_result: { lobbyId: string; result: string };
+  custom_lobby_submission: { lobbyId: string; userId: string; username: string; status: string; score: number; passed: number; total: number; compileError?: string };
+  error: { message: string };
 }
 
 export type RealtimeEventName = keyof RealtimeEventMap;

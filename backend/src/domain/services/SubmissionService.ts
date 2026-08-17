@@ -9,7 +9,7 @@ import { RESPONSE_CODES, RESPONSE_MESSAGES, ResponseData } from "../classes/Resp
 import { SubmissionDTO } from "../classes/SubmissionDTO";
 
 export class SubmissionService {
-    async createSubmission(userId: string, problemId: string, language: Language, code: string, mode: 'match' | 'upsolve' = 'match'): Promise<Submission> {
+    async createSubmission(userId: string, problemId: string, language: Language, code: string, mode: 'match' | 'upsolve' | 'custom' = 'match', matchId?: string): Promise<Submission> {
         // 1. Validate relations exist in the database
         const user = await userRepository.getUserById(userId);
         if (!user) throw new Error("USER_NOT_FOUND");
@@ -40,7 +40,8 @@ export class SubmissionService {
                 code, 
                 problemId: problem.id,
                 userId: user.id,
-                mode
+                mode,
+                matchId
             };
             
             await kafkaProducerClient.sendMessage("code-submissions", kafkaPayload);

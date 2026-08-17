@@ -38,5 +38,6 @@
     "emitDecoratorMetadata": true,
     "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true
-  }
+  },
+  "include": ["src/**/*"]
 }

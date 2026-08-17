@@ -26,11 +26,12 @@ interface CodeWorkspaceProps {
   error: string | null;
   setError: (err: string | null) => void;
   
-  activeTab: 'output' | 'tests' | 'opponent';
-  setActiveTab: (t: 'output' | 'tests' | 'opponent') => void;
+  activeTab: 'output' | 'tests' | 'opponent' | 'rankings';
+  setActiveTab: (t: 'output' | 'tests' | 'opponent' | 'rankings') => void;
   
   showOpponentTab?: boolean;
   opponentStatus?: string;
+  leaderboard?: any[];
 
   initialCode?: string | null;
   initialLanguage?: string | null;
@@ -51,7 +52,8 @@ export function CodeWorkspace({
   activeTab,
   setActiveTab,
   showOpponentTab = false,
-  opponentStatus = '',
+  opponentStatus = 'Waiting',
+  leaderboard = undefined,
   initialCode,
   initialLanguage
 }: CodeWorkspaceProps) {
@@ -130,7 +132,7 @@ export function CodeWorkspace({
   };
 
   const monacoLanguage = language.toLowerCase() === 'python' ? 'python' : 'cpp';
-  const tabs = showOpponentTab ? ['tests', 'output', 'opponent'] : ['tests', 'output'];
+  const tabs = leaderboard ? ['tests', 'output', 'rankings'] : (showOpponentTab ? ['tests', 'output', 'opponent'] : ['tests', 'output']);
 
   return (
     <div className="space-y-4">

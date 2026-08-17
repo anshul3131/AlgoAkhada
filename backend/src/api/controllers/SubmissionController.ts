@@ -21,7 +21,7 @@ export class SubmissionController {
             console.log(userId);
             
             // Destructure the payload safely
-            const { problemId, language, code, mode } = body;
+            const { problemId, language, code, mode, matchId } = body;
 
             // Validate all required fields are present
             if (!problemId || !language || !code) {
@@ -29,7 +29,7 @@ export class SubmissionController {
             }
 
             // Execute the transaction and queue the job in Kafka
-            const submission = await submissionService.createSubmission(userId, problemId, language, code, mode);
+            const submission = await submissionService.createSubmission(userId, problemId, language, code, mode, matchId);
             
             // Exclude the raw code from the response payload to keep the network response lightweight
             const responseData = {

@@ -5,8 +5,11 @@ export function useCountdownTimer(durationSeconds: number, onExpire?: () => void
   const [remaining, setRemaining] = useState(durationSeconds);
   const expiredRef = useRef(false);
 
+  const endTimeRef = useRef(Date.now() + durationSeconds * 1000);
+
   useEffect(() => {
     setRemaining(durationSeconds);
+    endTimeRef.current = Date.now() + durationSeconds * 1000;
     expiredRef.current = false;
   }, [durationSeconds]);
 
@@ -18,13 +21,14 @@ export function useCountdownTimer(durationSeconds: number, onExpire?: () => void
     }
 
     const interval = window.setInterval(() => {
-      setRemaining((current) => {
-        if (current <= 1) {
+      setRemaining(() => {
+        const current = Math.ceil((endTimeRef.current - Date.now()) / 1000);
+        if (current <= 0) {
           window.clearInterval(interval);
           return 0;
         }
 
-        return current - 1;
+        return current;
       });
     }, 1000);
 

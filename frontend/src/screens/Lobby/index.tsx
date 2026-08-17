@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Badge } from '../../components/shared/Badge';
 import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { OdometerNumber } from '../../components/shared/OdometerNumber';
 import { matchApi, problemApi } from '../../lib/api';
 import type { Player, RecentMatchRecord } from '../../types';
+import { CustomLobbyRulesModal } from '../../components/shared/CreateCustomLobbyModal';
 
 const mockPlayer: Player = {
   id: 'you',
@@ -23,6 +24,9 @@ export function LobbyDashboard({
   onLogout,
   onReviewSolution,
   onUpsolve,
+  onCreateCustomLobby,
+  onJoinByCode,
+  externalError,
 }: {
   onFindMatch: () => void;
   onExploreTags: () => void;
@@ -31,14 +35,47 @@ export function LobbyDashboard({
   onLogout?: () => void;
   onReviewSolution: (submissionId: string) => void;
   onUpsolve: (problemId: string) => void;
+  onCreateCustomLobby: (lobbyId: string) => void;
+  onJoinByCode: (code: string) => void;
+  externalError?: string | null;
 }) {
   const [recentMatches, setRecentMatches] = useState<RecentMatchRecord[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const displayError = externalError || error;
   const currentElo = elo ?? mockPlayer.elo;
   const rankProgress = useMemo(() => Math.min((currentElo / 2600) * 100, 100), [currentElo]);
+  const [isCustomLobbyModalOpen, setIsCustomLobbyModalOpen] = useState(false);
+  const [isJoinLobbyModalOpen, setIsJoinLobbyModalOpen] = useState(false);
+  const [joinCodeArr, setJoinCodeArr] = useState(['', '', '', '', '', '']);
+  const joinCodeRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const handleJoinCodeChange = (index: number, value: string) => {
+    const val = value.slice(-1).toUpperCase();
+    const newArr = [...joinCodeArr];
+    newArr[index] = val;
+    setJoinCodeArr(newArr);
+    
+    if (val && index < 5) {
+      joinCodeRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleJoinCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !joinCodeArr[index] && index > 0) {
+      joinCodeRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleJoinCodePaste = (e: React.ClipboardEvent) => {
+    const paste = e.clipboardData.getData('text').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (paste.length === 6) {
+      setJoinCodeArr(paste.split(''));
+    }
+  };
 
   useEffect(() => {
     let isCancelled = false;
@@ -110,8 +147,13 @@ export function LobbyDashboard({
               </button>
             ))}
           </div>
-          <Button className="h-[220px] w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
-          <Button variant="ghost" className="w-full text-xs uppercase tracking-[0.2em]" onClick={onExploreTags}>Browse Topics</Button>
+          <Button className="h-[200px] w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
+          <div className="grid grid-cols-2 gap-4">
+            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={onExploreTags}>Browse Topics</Button>
+            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsJoinLobbyModalOpen(true)}>Join Lobby</Button>
+            <Button variant="primary" className="col-span-2 text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsCustomLobbyModalOpen(true)}>Create Custom Match</Button>
+          </div>
+          {!isJoinLobbyModalOpen && displayError && <div className="text-accent-danger text-xs text-center uppercase tracking-widest">{displayError}</div>}
         </GlowPanel>
 
         <GlowPanel className="max-h-[480px] overflow-hidden">
@@ -120,7 +162,7 @@ export function LobbyDashboard({
             <Badge label="Live" tone="primary" />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[290px] overflow-y-auto pr-2">
             {isLoadingMatches ? (
               <div className="rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-4 text-sm text-text-secondary">Loading matches...</div>
             ) : error ? (
@@ -207,6 +249,58 @@ export function LobbyDashboard({
           </div>
         </GlowPanel>
       </div>
+
+      <CustomLobbyRulesModal 
+        isOpen={isCustomLobbyModalOpen} 
+        onClose={() => setIsCustomLobbyModalOpen(false)} 
+        onSubmit={(lobbyId) => {
+          setIsCustomLobbyModalOpen(false);
+          onCreateCustomLobby(lobbyId);
+        }} 
+      />
+
+      {isJoinLobbyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <GlowPanel className="max-w-md w-full p-8 text-center relative">
+            <button 
+              onClick={() => setIsJoinLobbyModalOpen(false)} 
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary text-xl"
+            >
+              ✕
+            </button>
+            <h2 className="text-2xl font-mono uppercase tracking-[0.2em] text-accent-primary mb-2">Join Lobby</h2>
+            <p className="text-sm text-text-secondary mb-8">Enter the 6-character code</p>
+            
+            <div className="flex justify-center gap-2 mb-2" onPaste={handleJoinCodePaste}>
+              {joinCodeArr.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={el => joinCodeRefs.current[idx] = el}
+                  type="text"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleJoinCodeChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleJoinCodeKeyDown(idx, e)}
+                  className="w-12 h-14 rounded-lg border border-border-subtle bg-bg-void text-center text-2xl font-mono font-bold text-text-primary uppercase focus:border-accent-primary focus:outline-none transition-colors"
+                />
+              ))}
+            </div>
+            
+            <div className="h-6 mb-6 flex items-center justify-center">
+              {displayError && <span className="text-accent-danger text-xs uppercase tracking-widest">{displayError}</span>}
+            </div>
+            
+            <Button 
+              variant="primary" 
+              className="w-full py-3"
+              disabled={!joinCodeArr.every(v => v !== '')}
+              onClick={() => onJoinByCode(joinCodeArr.join(''))}
+            >
+              Join Match
+            </Button>
+          </GlowPanel>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ export function PracticeScreen({
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
   const [languages, setLanguages] = useState<LanguageRecord[]>([]);
   
-  const [activeTab, setActiveTab] = useState<'output' | 'tests' | 'opponent'>('tests');
+  const [activeTab, setActiveTab] = useState<'output' | 'tests' | 'opponent' | 'rankings'>('tests');
   const [verdict, setVerdict] = useState('Ready to submit');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);

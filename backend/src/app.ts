@@ -7,6 +7,8 @@ import { TestCaseController } from "./api/controllers/TestCaseController";
 import { AuthController } from "./api/controllers/AuthController";
 import { RecentMatchController } from "./api/controllers/RecentMatchController";
 import { ExecutionController } from "./api/controllers/ExecutionController";
+import { CustomMatchController } from "./api/controllers/CustomMatchController";
+import { UserController } from "./api/controllers/UserController";
 import jwt from "jsonwebtoken";
 import { Action } from "routing-controllers";
 
@@ -16,7 +18,7 @@ app.use(cookieParser());
 
 // Register Controllers using routing-controllers
 useExpressServer(app, {
-    controllers: [AuthController,ProblemController, SubmissionController,TestCaseController, RecentMatchController, ExecutionController], // Add other controllers as needed
+    controllers: [AuthController,ProblemController, SubmissionController,TestCaseController, RecentMatchController, ExecutionController, CustomMatchController, UserController], // Add other controllers as needed
     // We disable the default error handler to strictly use our custom ResponseBuilder
 
     // 1. Add the Authorization Checker

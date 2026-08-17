@@ -50,6 +50,13 @@ export class ProblemRepository extends Repository<Problem> {
             totalPages: Math.ceil(total / limit)
         };
     }
+
+    async getRandomProblemByTopic(topic: string) {
+        return await this.createQueryBuilder("problem")
+            .where(":tag = ANY(problem.tags)", { tag: topic })
+            .orderBy("RANDOM()")
+            .getOne();
+    }
 }
 
 export const problemRepository = new ProblemRepository();

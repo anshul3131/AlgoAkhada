@@ -135,6 +135,7 @@ export const userApi = {
 
   getUser: (id: string) => request<UserRecord>(`/users/${id}`),
   me: () => request<AuthUser>('/users/me'),
+  searchUsers: (prefix: string) => request<any>(`/users/search?prefix=${encodeURIComponent(prefix)}`),
 };
 
 export const problemApi = {
@@ -160,8 +161,9 @@ export const submissionApi = {
     problemId: string;
     language: string;
     code: string;
-    mode?: 'match' | 'upsolve';
-  }, mode: 'match' | 'upsolve' = 'match') => {
+    mode?: 'match' | 'upsolve' | 'custom';
+    matchId?: string;
+  }, mode: 'match' | 'upsolve' | 'custom' = 'match') => {
     const requestPayload = { ...payload, mode: payload.mode ?? mode };
     if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
       console.debug('[submission] POST /api/submissions', requestPayload);
@@ -182,6 +184,7 @@ export interface LanguageRecord {
 
 export interface ExecutionResponse {
   status: string;
+  compileError?: string;
   aggregated: { passed: number; total: number; };
   testCaseResults?: {
     testCaseId: string;
@@ -208,4 +211,9 @@ export const executionApi = {
     body: JSON.stringify(payload)
   })
 };
+
+export const customMatchApi = {
+  getMatch: (id: string) => request<any>(`/custom-matches/${id}`),
+};
+
 

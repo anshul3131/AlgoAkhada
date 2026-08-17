@@ -6,4 +6,5 @@ export interface SubmitCodeDTO {
     language: Language;
     code: string;
     mode? : SubmissionMode;
+    matchId?: string;
 }

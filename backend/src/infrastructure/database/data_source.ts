@@ -6,6 +6,8 @@ import { TestCase } from "../../domain/entities/TestCase";
 import { Problem } from "../../domain/entities/Problem";
 import { Match } from "../../domain/entities/Match";
 import { MatchHistory } from "../../domain/entities/MatchHistory";
+import { CustomMatch } from "../../domain/entities/CustomMatch";
+import { CustomMatchParticipant } from "../../domain/entities/CustomMatchParticipant";
 
 // Optional: If you test locally outside of K8s, uncomment this to read a local .env file
 // import * as dotenv from "dotenv";
@@ -23,6 +25,6 @@ export const AppDataSource = new DataSource({
     
     synchronize: false, 
     logging: true,
-    entities: [User, Problem, TestCase, Submission, Match, MatchHistory],
+    entities: [User, Problem, TestCase, Submission, Match, MatchHistory, CustomMatch, CustomMatchParticipant],
     migrations: ["src/infrastructure/database/migrations/*.ts"],
 });

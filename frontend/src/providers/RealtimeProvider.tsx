@@ -13,6 +13,7 @@ interface RealtimeContextValue {
   subscribeToSubmission: (submissionId: string) => void;
   emit: <K extends RealtimeEventName>(eventName: K, payload: RealtimeEventMap[K]) => void;
   subscribe: <K extends RealtimeEventName>(eventName: K, handler: (payload: RealtimeEventMap[K]) => void) => () => void;
+  socket: Socket | null;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -31,7 +32,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     socket.on('disconnect', () => setConnected(false));
     socket.on('connect_error', (caughtError) => setError(caughtError.message));
 
-    const events: RealtimeEventName[] = ['queue_status', 'match_found', 'opponent_status', 'match_result', 'elo_update', 'evaluation_complete'];
+    const events: RealtimeEventName[] = ['queue_status', 'match_found', 'opponent_status', 'match_result', 'elo_update', 'evaluation_complete', 'custom_lobby_invite_received', 'custom_lobby_updated', 'custom_lobby_joined', 'custom_match_started', 'custom_lobby_declined', 'custom_lobby_left', 'custom_match_result', 'custom_lobby_submission', 'error'];
     events.forEach((eventName) => {
       socket.on(eventName, (payload) => {
         listenersRef.current[eventName]?.forEach((handler) => handler(payload as never));
@@ -48,6 +49,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<RealtimeContextValue>(() => ({
     connected,
     error,
+    socket: socketRef.current,
     joinQueue: (payload) => {
       if (payload && Object.keys(payload).length > 0) {
         socketRef.current?.emit('join_queue', payload);
@@ -93,4 +95,9 @@ export function useRealtimeEvent<K extends RealtimeEventName>(
     const unsubscribe = subscribe(eventName, handler);
     return unsubscribe;
   }, [eventName, handler, subscribe]);
+}
+
+export function useSocket() {
+  const context = useContext(RealtimeContext);
+  return context?.socket || null;
 }

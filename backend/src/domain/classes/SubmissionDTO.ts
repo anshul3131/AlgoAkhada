@@ -10,5 +10,6 @@ export class SubmissionDTO {
 
 export enum SubmissionMode{
     MATCH = 'match',
-    UPSOLVE = 'upsolve'
+    UPSOLVE = 'upsolve',
+    CUSTOM = 'custom'
 }

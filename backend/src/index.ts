@@ -10,6 +10,11 @@ import { appEvents } from "./utils/EventEmitter";
 import { redisClient } from "./infrastructure/redis/RedisClient";
 import { matchmakerService } from "./domain/services/MatchmakerService";
 import { matchService } from "./domain/services/MatchService";
+import { customMatchService } from "./domain/services/CustomMatchService";
+import { customMatchRepository } from "./infrastructure/database/repositories/CustomMatchRepository";
+import { customMatchParticipantRepository } from "./infrastructure/database/repositories/CustomMatchParticipantRepository";
+import { MatchStatus } from "./domain/enums/MatchStatus";
+import { CustomParticipantStatus } from "./domain/enums/CustomParticipantStatus";
 
 async function startServer(): Promise<void> {
     let server: http.Server | null = null; // 1. Declare server variable here for proper scoping
@@ -171,6 +176,28 @@ async function startServer(): Promise<void> {
                 await matchService.finishMatchByTimeout(matchId, userId);
             });
 
+            socket.on('custom_lobby_leave_match', async (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !data.lobbyId) return;
+
+                const match = await customMatchRepository.getMatchById(data.lobbyId);
+                if (match) {
+                    const participant = match.participants?.find(p => p.user.id === userId);
+                    if (participant) {
+                        participant.status = CustomParticipantStatus.FORFEITED;
+                        await customMatchParticipantRepository.saveEntity(participant);
+
+                        io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_submission', {
+                            lobbyId: data.lobbyId,
+                            userId,
+                            username: participant.user.username,
+                            status: 'LEFT',
+                            score: participant.score
+                        });
+                    }
+                }
+            });
+
             socket.on('leave_queue', async () => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;
@@ -179,6 +206,133 @@ async function startServer(): Promise<void> {
                 socket.emit('queue_status', { status: 'left' });
                 console.log(`User ${userId} left the queue.`);
             });
+
+            // --- Custom Lobbies ---
+            socket.on('custom_lobby_create', async (data: { topic: string, timeLimit: number, maxParticipants: number }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                
+                const response = await customMatchService.createLobby(userId, data.topic, data.timeLimit, data.maxParticipants);
+                if (response.responseCode < 400 && response.data) {
+                    const lobbyId = response.data.id;
+                    socket.join(`lobby:${lobbyId}`);
+                    socket.emit('custom_lobby_updated', response.data);
+                } else {
+                    socket.emit('error', { message: response.data || 'Failed to create lobby' });
+                }
+            });
+
+            socket.on('custom_lobby_update', async (data: { lobbyId: string, topic: string, timeLimit: number, maxParticipants: number }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+
+                const response = await customMatchService.updateLobby(data.lobbyId, userId, data);
+                if (response.responseCode < 400 && response.data) {
+                    io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                } else {
+                    socket.emit('error', { message: response.data || 'Failed to update lobby' });
+                }
+            });
+
+            socket.on('custom_lobby_invite', (data: { lobbyId: string, invitedUserId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                // Emit to the specific user's socket room
+                io.to(`user:${data.invitedUserId}`).emit('custom_lobby_invite_received', {
+                    lobbyId: data.lobbyId,
+                    inviterId: userId,
+                    inviterUsername: socket.data.user.username
+                });
+            });
+
+            socket.on('custom_lobby_join', async (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                
+                const response = await customMatchService.joinLobby(data.lobbyId, userId);
+                if (response.responseCode < 400 && response.data) {
+                    socket.join(`lobby:${data.lobbyId}`);
+                    // Broadcast updated lobby to everyone in the room
+                    io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                } else {
+                    socket.emit('error', { message: response.data || 'Failed to join lobby' });
+                }
+            });
+
+            socket.on('custom_lobby_join_by_code', async (data: { joinCode: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+
+                const response = await customMatchService.joinLobbyByCode(data.joinCode, userId);
+                if (response.responseCode < 400 && response.data) {
+                    socket.join(`lobby:${response.data.id}`);
+                    io.to(`lobby:${response.data.id}`).emit('custom_lobby_updated', response.data);
+                    socket.emit('custom_lobby_joined', response.data);
+                } else {
+                    socket.emit('error', { message: response.data || 'Failed to join lobby' });
+                }
+            });
+
+            socket.on('custom_lobby_decline', (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                // Notify the lobby that this user declined
+                io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_declined', {
+                    lobbyId: data.lobbyId,
+                    declinerId: userId
+                });
+            });
+            socket.on('custom_lobby_timeout', async (data: { lobbyId: string }) => {
+                const match = await customMatchRepository.getMatchById(data.lobbyId);
+                
+                if (match && match.status !== MatchStatus.FINISHED) {
+                    match.status = MatchStatus.FINISHED;
+                    await customMatchRepository.saveEntity(match);
+                }
+
+                const leaderboard = (match?.participants || []).map(p => ({
+                    userId: p.user.id,
+                    username: p.user.username,
+                    score: p.score || 0
+                })).sort((a, b) => b.score - a.score);
+
+                io.to(`lobby:${data.lobbyId}`).emit('custom_match_result', {
+                    lobbyId: data.lobbyId,
+                    result: 'timeout',
+                    leaderboard
+                });
+            });
+
+            socket.on('custom_lobby_leave', async (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                socket.leave(`lobby:${data.lobbyId}`);
+                const response = await customMatchService.leaveLobby(data.lobbyId, userId);
+                if (response.responseCode < 400 && response.data) {
+                    io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                    io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_left', { lobbyId: data.lobbyId, userId });
+                }
+            });
+
+            socket.on('custom_lobby_start', async (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+
+                const response = await customMatchService.startMatch(data.lobbyId, userId);
+                if (response.responseCode < 400 && response.data) {
+                    io.to(`lobby:${data.lobbyId}`).emit('custom_match_started', response.data);
+                } else {
+                    socket.emit('error', { message: response.data || 'Failed to start match' });
+                }
+            });
+
+            socket.on('custom_lobby_forfeit', async (data: { lobbyId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+
+                await customMatchService.forfeitMatch(data.lobbyId, userId);
+                io.to(`user:${userId}`).emit('custom_match_result', { lobbyId: data.lobbyId, result: 'FORFEIT' });
+            });
         });
 
         // The Bridge: Listen to our internal Event Emitter
@@ -186,6 +340,10 @@ async function startServer(): Promise<void> {
             // Blast the result ONLY to the user sitting in this specific submission's room
             console.log(`🚀Event With Submission Id : ${resultData.submissionId} fired`)
             io.to(resultData.submissionId).emit('evaluation_complete', resultData);
+        });
+
+        appEvents.on('custom_submission_graded', (resultData) => {
+            io.to(`lobby:${resultData.lobbyId}`).emit('custom_lobby_submission', resultData);
         });
 
         // Matchmaking Events

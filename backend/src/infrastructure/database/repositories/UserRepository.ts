@@ -26,6 +26,14 @@ export class UserRepository extends Repository<User> {
     async getUserByEmail(email: string) {
         return await this.findOne({ where: { email } });
     }
+
+    async searchUsersByUsernamePrefix(prefix: string, limit: number = 10) {
+        return await this.createQueryBuilder("user")
+            .where("user.username ILIKE :prefix", { prefix: `${prefix}%` })
+            .select(["user.id", "user.username", "user.elo_rating"])
+            .take(limit)
+            .getMany();
+    }
 }
 
 export const userRepository = new UserRepository();

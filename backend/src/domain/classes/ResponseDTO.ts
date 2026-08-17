@@ -164,6 +164,11 @@ export const RESPONSE_MESSAGES = {
     CHILD_ALREADY_REFERRED: 'Child user already has a referral',
     PARENT_CREATED_AFTER_CHILD: 'Parent user was created after child user',
     WALLET_TRIGGER_FAILED: 'Failed to trigger referral worker in wallet service',
+    HOST_NOT_FOUND: 'Host not found',
+    LOBBY_NOT_FOUND: 'Lobby not found',
+    MATCH_ALREADY_STARTED: 'Match already started',
+    ONLY_HOST_CAN_START: 'Only host can start',
+    NO_PROBLEMS_FOUND_FOR_TOPIC: 'No problems found for topic',
 }
 
 export const RESPONSE_CODES = {
@@ -190,6 +195,7 @@ export const RESPONSE_CODES = {
     DATA_UNAVAILABLE : 1019,
     BAD_REQUEST: 404,
     UNAUTHORISED : 401,
+    UNAUTHORIZED : 401,
     UPDATE_APP : 419,
     NOT_ALLOWED : 1020,
     UNPROCESSABLE_ENTITY: 422,

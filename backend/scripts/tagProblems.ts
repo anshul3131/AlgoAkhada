@@ -15,7 +15,7 @@ if (!process.env.GEMINI_API_KEY) {
     process.exit(1);
 }
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 5;
 const DELAY_BETWEEN_BATCHES_MS = 10000;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
