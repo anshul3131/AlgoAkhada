@@ -26,6 +26,29 @@ export class MatchRepository extends Repository<Match> {
             take: limit
         });
     }
+
+    async getUserMatchStats(userId: string): Promise<{ wins: number, losses: number }> {
+        const matches = await this.find({
+            where: [
+                { user1: { id: userId }, status: MatchStatus.FINISHED },
+                { user2: { id: userId }, status: MatchStatus.FINISHED }
+            ],
+            relations: { winner: true }
+        });
+
+        let wins = 0;
+        let losses = 0;
+
+        for (const match of matches) {
+            if (match.winner && match.winner.id === userId) {
+                wins++;
+            } else if (match.winner && match.winner.id !== userId) {
+                losses++;
+            }
+        }
+
+        return { wins, losses };
+    }
 }
 
 export const matchRepository = new MatchRepository();

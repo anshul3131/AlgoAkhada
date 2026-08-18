@@ -7,6 +7,7 @@ import { useCountdownTimer } from '../../hooks/useCountdownTimer';
 import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimeProvider';
 import { problemApi, submissionApi, executionApi, type ProblemRecord, type LanguageRecord } from '../../lib/api';
 import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
+import { SplitLayout } from '../../components/shared/SplitLayout';
 
 interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
 
@@ -91,34 +92,37 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
         </div>
       </GlowPanel>
 
-      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <GlowPanel className="space-y-5 xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
-          <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
-          <div>
-            <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
-            <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
-          </div>
-          <div className="border-t border-border-hairline pt-4"><p className="mb-3 text-xs uppercase tracking-[0.2em] text-text-secondary">Match brief</p><div className="grid grid-cols-2 gap-2"><ApiStatus label="Time" value={`${problem?.timeLimit ?? 2}s`} /><ApiStatus label="Memory" value={`${problem?.memoryLimit ?? 256}MB`} /></div></div>
-        </GlowPanel>
-
-        <CodeWorkspace 
-          problemId={problemId}
-          problem={problem}
-          languages={languages}
-          isSubmitting={isSubmitting}
-          isTimingOut={isTimingOut}
-          submitLabel="Submit Solution"
-          onSubmit={submit}
-          verdict={verdict}
-          setVerdict={setVerdict}
-          error={error}
-          setError={setError}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          showOpponentTab={true}
-          opponentStatus={opponentStatus}
-        />
-      </div>
+      <SplitLayout
+        left={
+          <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
+            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
+            <div>
+              <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
+              <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
+            </div>
+            <div className="border-t border-border-hairline pt-4"><p className="mb-3 text-xs uppercase tracking-[0.2em] text-text-secondary">Match brief</p><div className="grid grid-cols-2 gap-2"><ApiStatus label="Time" value={`${problem?.timeLimit ?? 2}s`} /><ApiStatus label="Memory" value={`${problem?.memoryLimit ?? 256}MB`} /></div></div>
+          </GlowPanel>
+        }
+        right={
+          <CodeWorkspace 
+            problemId={problemId}
+            problem={problem}
+            languages={languages}
+            isSubmitting={isSubmitting}
+            isTimingOut={isTimingOut}
+            submitLabel="Submit Solution"
+            onSubmit={submit}
+            verdict={verdict}
+            setVerdict={setVerdict}
+            error={error}
+            setError={setError}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            showOpponentTab={true}
+            opponentStatus={opponentStatus}
+          />
+        }
+      />
     </main>
   );
 }

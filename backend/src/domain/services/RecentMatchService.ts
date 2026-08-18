@@ -56,6 +56,16 @@ export class RecentMatchService {
             return ResponseData.build(RESPONSE_CODES.FAILURE,RESPONSE_MESSAGES.SOMETHING_WENT_WRONG)
         }
     }
+
+    public async getUserStats(userId: string): Promise<ResponseData> {
+        try {
+            const stats = await matchRepository.getUserMatchStats(userId);
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, stats);
+        } catch (error: any) {
+            console.error(`[RecentMatchService] getUserStats error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
 }
 
 export const recentMatchService = new RecentMatchService();

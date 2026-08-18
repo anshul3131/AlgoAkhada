@@ -30,12 +30,11 @@ export class Problem {
     difficulty: ProblemDifficulty;
 
     @Column({
-        type: "enum",
-        enum: ProblemTag,
+        type: "text",
         array: true,
         default: []
     })
-    tags: ProblemTag[];
+    tags: string[];
 
     @Column("float", { default: 2.0 }) // Time limit in seconds
     timeLimit: number;

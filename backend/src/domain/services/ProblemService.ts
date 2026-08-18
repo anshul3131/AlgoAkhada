@@ -41,7 +41,6 @@ export class ProblemService {
         try {
             page = page ? Number(page) : 1;
             limit = limit ? Number(limit) : 20;
-            difficulty = difficulty || ProblemDifficulty.MEDIUM;
 
             const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
             
@@ -124,6 +123,7 @@ export class ProblemService {
                 problem.difficulty = item?.difficulty || ProblemDifficulty.MEDIUM;
                 problem.timeLimit = item.timeLimit || 2;
                 problem.memoryLimit = item.memoryLimit || 256;
+                problem.tags = item.tags || [];
                 
                 const savedProblem = await queryRunner.manager.save(problem);
                 problemsAdded++;

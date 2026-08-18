@@ -5,17 +5,22 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import { problemApi } from '../../lib/api';
 import type { ProblemListItem } from '../../types';
 
-export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }: {
+export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, initialTag }: {
   onBackToLobby: () => void;
   onSolveProblem: (problemId: string) => void;
   onFindMatch: (tag: string) => void;
+  initialTag?: string;
 }) {
   const [tags, setTags] = useState<string[]>([]);
-  const [selectedTag, setSelectedTag] = useState<string>('binary search');
+  const [selectedTag, setSelectedTag] = useState<string>(initialTag || 'binary search');
   const [problems, setProblems] = useState<ProblemListItem[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
   const [loadingProblems, setLoadingProblems] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
 
   useEffect(() => {
     const loadTags = async () => {
@@ -39,6 +44,11 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }
     void loadTags();
   }, [selectedTag]);
 
+  // Reset page when tag changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedTag]);
+
   useEffect(() => {
     const loadProblems = async () => {
       if (!selectedTag) return;
@@ -47,8 +57,9 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }
       setError(null);
 
       try {
-        const response = await problemApi.getProblemsByTag(selectedTag, 1, 20);
+        const response = await problemApi.getProblemsByTag(selectedTag, page, limit);
         setProblems(response.items ?? []);
+        setTotalPages(Math.ceil((response.total || 0) / limit) || 1);
       } catch (caughtError) {
         setError((caughtError as Error).message);
       } finally {
@@ -57,7 +68,7 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }
     };
 
     void loadProblems();
-  }, [selectedTag]);
+  }, [selectedTag, page]);
 
   const difficultyTone = useMemo(() => ({
     Easy: 'text-accent-primary',
@@ -135,6 +146,28 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch }
               </div>
             </GlowPanel>
           ))
+        )}
+
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <span className="font-mono text-xs text-text-secondary">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              Next
+            </Button>
+          </div>
         )}
       </div>
     </main>

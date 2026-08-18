@@ -24,7 +24,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME || "cp_matchmaker_db",
     
     synchronize: false, 
-    logging: true,
+    logging: ["error"],
     entities: [User, Problem, TestCase, Submission, Match, MatchHistory, CustomMatch, CustomMatchParticipant],
     migrations: ["src/infrastructure/database/migrations/*.ts"],
 });

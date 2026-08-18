@@ -29,7 +29,7 @@ export function LobbyDashboard({
   externalError,
 }: {
   onFindMatch: () => void;
-  onExploreTags: () => void;
+  onExploreTags: (tag?: string) => void;
   username?: string;
   elo?: number;
   onLogout?: () => void;
@@ -77,17 +77,26 @@ export function LobbyDashboard({
     }
   };
 
+  const [stats, setStats] = useState<{wins: number, losses: number}>({wins: 0, losses: 0});
+
   useEffect(() => {
     let isCancelled = false;
 
-    const loadRecentMatches = async () => {
+    const loadData = async () => {
       setIsLoadingMatches(true);
+      setIsLoadingTags(true);
       setError(null);
 
       try {
-        const matches = await matchApi.getRecentMatches(5);
+        const [matches, userStats, tagsData] = await Promise.all([
+          matchApi.getRecentMatches(5),
+          matchApi.getUserStats(),
+          problemApi.getTags()
+        ]);
         if (!isCancelled) {
           setRecentMatches(matches);
+          setStats(userStats);
+          setTags(tagsData.tags);
         }
       } catch (caughtError) {
         if (!isCancelled) {
@@ -96,11 +105,12 @@ export function LobbyDashboard({
       } finally {
         if (!isCancelled) {
           setIsLoadingMatches(false);
+          setIsLoadingTags(false);
         }
       }
     };
 
-    void loadRecentMatches();
+    void loadData();
 
     return () => {
       isCancelled = true;
@@ -131,8 +141,8 @@ export function LobbyDashboard({
             <div className="h-full rounded-full bg-accent-primary" style={{ width: `${rankProgress}%` }} />
           </div>
           <div className="flex justify-between text-xs uppercase tracking-[0.2em] text-text-secondary">
-            <span>Wins 18</span>
-            <span>Losses 7</span>
+            <span>Wins {stats.wins}</span>
+            <span>Losses {stats.losses}</span>
           </div>
         </GlowPanel>
 
@@ -149,7 +159,7 @@ export function LobbyDashboard({
           </div>
           <Button className="h-[200px] w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
           <div className="grid grid-cols-2 gap-4">
-            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={onExploreTags}>Browse Topics</Button>
+            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={() => onExploreTags()}>Browse Topics</Button>
             <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsJoinLobbyModalOpen(true)}>Join Lobby</Button>
             <Button variant="primary" className="col-span-2 text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsCustomLobbyModalOpen(true)}>Create Custom Match</Button>
           </div>
@@ -227,7 +237,7 @@ export function LobbyDashboard({
       <div className="mt-6">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Topics</p>
-          <button onClick={onExploreTags} className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-primary hover:text-accent-primary/80">Open all</button>
+          <button onClick={() => onExploreTags()} className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-primary hover:text-accent-primary/80">Open all</button>
         </div>
         <GlowPanel className="p-3">
           <div className="flex flex-wrap gap-2">
@@ -239,7 +249,7 @@ export function LobbyDashboard({
               tags.map((tag) => (
                 <button
                   key={tag}
-                  onClick={onExploreTags}
+                  onClick={() => onExploreTags(tag)}
                   className="rounded-full border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-primary transition hover:border-accent-primary hover:text-accent-primary"
                 >
                   {tag}

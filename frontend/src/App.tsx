@@ -29,6 +29,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
   const [reviewSubmissionId, setReviewSubmissionId] = useState<string | null>(() => sessionStorage.getItem('reviewSubmissionId') || null);
   const [practiceProblemId, setPracticeProblemId] = useState<string | null>(() => sessionStorage.getItem('practiceProblemId') || null);
   const [customLobbyId, setCustomLobbyId] = useState<string | null>(() => sessionStorage.getItem('customLobbyId') || null);
+  const [tagExplorerInitialTag, setTagExplorerInitialTag] = useState<string | undefined>(undefined);
   const [inviteModal, setInviteModal] = useState<{ lobbyId: string, inviterUsername: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -122,7 +123,10 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           username={user.username}
           elo={elo}
           onFindMatch={enterQueue}
-          onExploreTags={() => setScreen('tag-explorer')}
+          onExploreTags={(tag) => {
+            setTagExplorerInitialTag(tag);
+            setScreen('tag-explorer');
+          }}
           onLogout={logout}
           onReviewSolution={onReviewSolution}
           onUpsolve={onUpsolve}
@@ -131,9 +135,8 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
             setScreen('custom-lobby');
           }}
           onJoinByCode={(code) => {
-            if (socket && code.length === 6) {
-              socket.emit('custom_lobby_join_by_code', { joinCode: code });
-            }
+            setCustomLobbyId(code);
+            setScreen('custom-lobby');
           }}
           externalError={errorMsg}
         />
@@ -145,6 +148,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
       {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} />}
       {screen === 'tag-explorer' && (
         <TagExplorerScreen
+          initialTag={tagExplorerInitialTag}
           onBackToLobby={() => setScreen('lobby')}
           onSolveProblem={(problemId) => {
             setPracticeProblemId(problemId);

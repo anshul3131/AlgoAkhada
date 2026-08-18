@@ -25,4 +25,18 @@ export class RecentMatchController {
             res.status(serviceResponse.responseCode).send({success : false,data : serviceResponse.data})
         }
     }
+
+    @Get("/stats")
+    async getUserStats(
+        @Res() res: Response,
+        @Req() req: any,
+    ) {
+        const userId = req.user.id;
+        const serviceResponse = await recentMatchService.getUserStats(userId);
+        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE){
+            res.status(serviceResponse.responseCode).send({success: true, data: serviceResponse.data});
+        } else {
+            res.status(serviceResponse.responseCode).send({success: false, data: serviceResponse.data});
+        }
+    }
 }

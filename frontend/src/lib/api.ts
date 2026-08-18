@@ -151,6 +151,7 @@ export const problemApi = {
 
 export const matchApi = {
   getRecentMatches: (limit = 10) => request<RecentMatchRecord[]>(`/matches/recent?limit=${limit}`),
+  getUserStats: () => request<{ wins: number, losses: number }>('/matches/stats'),
 };
 
 export const submissionApi = {

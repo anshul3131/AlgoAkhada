@@ -35,7 +35,7 @@ export class AuthService {
             await userRepository.saveEntity(newUser);
 
             const data: AuthResponseDTO = {
-                user: { id: newUser.id, email: newUser.email, username: newUser.username },
+                user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating },
                 accessToken,
                 refreshToken
             };
@@ -68,7 +68,7 @@ export class AuthService {
             await userRepository.saveEntity(user);
 
             const data: AuthResponseDTO = {
-                user: { id: user.id, email: user.email, username: user.username },
+                user: { id: user.id, email: user.email, username: user.username, elo_rating: user.elo_rating },
                 accessToken,
                 refreshToken
             };
