@@ -15,7 +15,7 @@ export function CustomLobbyRulesModal({
   isEditMode?: boolean;
   initialData?: { lobbyId?: string, topic: string, timeLimitMins: number, maxParticipants: number };
 }) {
-  const [topic, setTopic] = useState(initialData?.topic || 'dynamic programming');
+  const [topic, setTopic] = useState(initialData?.topic || 'dp');
   const [timeLimitMins, setTimeLimitMins] = useState(initialData?.timeLimitMins || 30);
   const [maxParticipants, setMaxParticipants] = useState(initialData?.maxParticipants || 10);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,17 +66,14 @@ export function CustomLobbyRulesModal({
   };
 
   const problemTags = [
-    "arrays", "strings", "sorting", "binary search", "two pointers", "sliding window",
-    "prefix sums", "hashing", "bit manipulation", "recursion", "backtracking", "greedy",
-    "dynamic programming", "math", "number theory", "combinatorics", "geometry",
-    "linked list", "stack", "queue", "deque", "heap", "trie", "trees", "binary search tree",
-    "tree algorithms", "graph", "graph traversal", "shortest path", "minimum spanning tree",
-    "topological sort", "disjoint set union", "strongly connected components", "network flow",
-    "range queries", "segment tree", "fenwick tree", "sparse table", "string algorithms",
-    "divide and conquer", "meet in the middle", "sqrt decomposition", "mo's algorithm",
-    "binary lifting", "heavy light decomposition", "game theory", "constructive algorithms",
-    "simulation", "probability"
-  ];
+    'greedy', 'graph matchings', 'brute force', 'geometry', 'games', 'graphs',
+    'dfs and similar', 'ternary search', 'string suffix structures', 'chinese remainder theorem',
+    'math', 'strings', 'two pointers', 'constructive algorithms', 'dsu', 'trees',
+    'fft', 'hashing', 'implementation', 'binary search', 'divide and conquer',
+    'schedules', 'probabilities', '2-sat', 'meet-in-the-middle', 'number theory',
+    'data structures', 'dp', 'flows', 'expression parsing', 'matrices',
+    'shortest paths', 'sortings', 'combinatorics', 'bitmasks'
+  ].sort();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

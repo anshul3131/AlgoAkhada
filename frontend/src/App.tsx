@@ -10,11 +10,13 @@ import { TagExplorerScreen } from './screens/TagExplorer';
 import { useAuth } from './hooks/useAuth';
 import { RealtimeProvider, useRealtimeEvent, useSocket } from './providers/RealtimeProvider';
 import { CustomLobbyScreen } from './screens/CustomLobby';
+import { DashboardScreen } from './screens/Dashboard';
 import { CustomBattleground } from './screens/CustomBattleground';
+import { SpectatorScreen } from './screens/Spectator';
 import type { AuthUser } from './lib/api';
 
-type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby';
-type MatchContext = { matchId: string; problemId: string };
+type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby' | 'dashboard' | 'spectator';
+type MatchContext = { matchId: string; problemId: string; players?: { id: string, username: string }[] };
 
 function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
   const [screen, setScreen] = useState<Screen>(() => (sessionStorage.getItem('screen') as Screen) || 'lobby');
@@ -127,6 +129,11 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
             setTagExplorerInitialTag(tag);
             setScreen('tag-explorer');
           }}
+          onDashboard={() => setScreen('dashboard')}
+          onSpectate={(matchId, problemId, players) => {
+            setMatch({ matchId, problemId, players });
+            setScreen('spectator');
+          }}
           onLogout={logout}
           onReviewSolution={onReviewSolution}
           onUpsolve={onUpsolve}
@@ -135,8 +142,9 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
             setScreen('custom-lobby');
           }}
           onJoinByCode={(code) => {
-            setCustomLobbyId(code);
-            setScreen('custom-lobby');
+            if (socket) {
+              socket.emit('custom_lobby_join_by_code', { joinCode: code });
+            }
           }}
           externalError={errorMsg}
         />
@@ -144,8 +152,9 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
       {screen === 'queue' && <MatchmakingQueue tag={queueTag} onCancel={() => setScreen('lobby')} onMatchFound={onMatchFound} />}
       {screen === 'battle' && match && <Battleground userId={user.id} matchId={match.matchId} problemId={match.problemId} onFinished={onFinished} />}
       {screen === 'custom-battle' && match && <CustomBattleground userId={user.id} lobbyId={match.matchId} problemId={match.problemId} onFinished={onCustomFinished} onLobby={() => setScreen('lobby')} />}
-      {screen === 'aftermath' && <AftermathScreen result={result} elo={elo} onRematch={enterQueue} onLobby={() => setScreen('lobby')} />}
-      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} />}
+      {screen === 'aftermath' && <AftermathScreen result={result} elo={elo} matchId={match?.matchId} onRematch={enterQueue} onMatchFound={onMatchFound} onLobby={() => setScreen('lobby')} />}
+      {screen === 'spectator' && match && <SpectatorScreen matchId={match.matchId} problemId={match.problemId} players={match.players} onBack={() => setScreen('lobby')} />}
+      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} onUpsolve={onUpsolve} />}
       {screen === 'tag-explorer' && (
         <TagExplorerScreen
           initialTag={tagExplorerInitialTag}
@@ -179,6 +188,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           }}
         />
       )}
+      {screen === 'dashboard' && <DashboardScreen onBack={() => setScreen('lobby')} username={user.username} />}
 
       {/* Invite Modal */}
       {inviteModal && (

@@ -13,7 +13,7 @@ import { SplitLayout } from '../../components/shared/SplitLayout';
 interface CustomBattlegroundProps { userId: string; lobbyId: string; problemId: string; onFinished: (result: any) => void; onLobby: () => void; }
 
 export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onLobby }: CustomBattlegroundProps) {
-  const { subscribeToSubmission } = useRealtimeContext();
+  const { subscribeToSubmission, updateMatchCode } = useRealtimeContext();
   const socket = useSocket();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
   const [languages, setLanguages] = useState<LanguageRecord[]>([]);
@@ -85,6 +85,11 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
     }
   });
 
+  const [spectatorCount, setSpectatorCount] = useState(0);
+  useRealtimeEvent('spectator_count', (count) => {
+    setSpectatorCount(count);
+  });
+
   useRealtimeEvent('custom_lobby_submission', (payload: any) => {
     if (payload.lobbyId === lobbyId) {
       setLeaderboard((prev) => {
@@ -126,7 +131,11 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
   return (
     <main className="mx-auto max-w-[1500px] p-4 md:p-6">
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3"><Badge label="CUSTOM MATCH" tone="danger" /><span className="font-mono text-sm text-text-secondary">lobby/{lobbyId.slice(0, 8)}</span></div>
+        <div className="flex items-center gap-3">
+          <Badge label="CUSTOM MATCH" tone="danger" />
+          <span className="font-mono text-sm text-text-secondary">lobby/{lobbyId.slice(0, 8)}</span>
+          {spectatorCount > 0 && <Badge label={`👁️ ${spectatorCount}`} tone="electric" />}
+        </div>
         <Timer value={remaining} pressure={pressureLevel} className="text-4xl" />
         <div className="flex items-center gap-4">
           <button 
@@ -177,6 +186,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
             isTimingOut={isTimingOut}
             submitLabel="Submit Solution"
             onSubmit={submit}
+            onCodeChange={(c, l) => updateMatchCode(lobbyId, c, l)}
             verdict={verdict}
             setVerdict={setVerdict}
             error={error}

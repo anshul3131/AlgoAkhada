@@ -101,7 +101,7 @@ export class MatchmakerService {
         }
     }
 
-    private async createMatch(user1Id: string, user2Id: string, tag: string) {
+    public async createMatch(user1Id: string, user2Id: string, tag: string) {
         console.log(`🎉 Match found: ${user1Id} vs ${user2Id} in tag: ${tag}`);
 
         const user1 = await userRepository.findOne({ where: { id: user1Id } });

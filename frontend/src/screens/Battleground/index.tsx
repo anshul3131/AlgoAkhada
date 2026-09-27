@@ -12,7 +12,7 @@ import { SplitLayout } from '../../components/shared/SplitLayout';
 interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
 
 export function Battleground({ userId, matchId, problemId, onFinished }: BattlegroundProps) {
-  const { joinMatch, subscribeToSubmission, finishMatchOnTimeout, forfeitMatch } = useRealtimeContext();
+  const { joinMatch, leaveMatch, updateMatchCode, subscribeToSubmission, finishMatchOnTimeout, forfeitMatch } = useRealtimeContext();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
   const [languages, setLanguages] = useState<LanguageRecord[]>([]);
   
@@ -28,7 +28,11 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
     joinMatch(matchId);
     void problemApi.getProblem(problemId).then(setProblem).catch((caughtError) => setError((caughtError as Error).message));
     void executionApi.getLanguages().then(setLanguages).catch(console.error);
-  }, [joinMatch, matchId, problemId]);
+
+    return () => {
+      leaveMatch(matchId);
+    };
+  }, [joinMatch, leaveMatch, matchId, problemId]);
 
   useEffect(() => { if (submissionId) subscribeToSubmission(submissionId); }, [submissionId, subscribeToSubmission]);
 
@@ -47,6 +51,11 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
   });
   useRealtimeEvent('match_result', (payload) => {
     if (payload.matchId === matchId) onFinished(payload.winnerId);
+  });
+
+  const [spectatorCount, setSpectatorCount] = useState(0);
+  useRealtimeEvent('spectator_count', (count) => {
+    setSpectatorCount(count);
   });
 
   const handleTimeout = useCallback(() => {
@@ -75,7 +84,11 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
   return (
     <main className="mx-auto max-w-[1500px] p-4 md:p-6">
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3"><Badge label="LIVE MATCH" tone="danger" /><span className="font-mono text-sm text-text-secondary">match/{matchId.slice(0, 8)}</span></div>
+        <div className="flex items-center gap-3">
+          <Badge label="LIVE MATCH" tone="danger" />
+          <span className="font-mono text-sm text-text-secondary">match/{matchId.slice(0, 8)}</span>
+          {spectatorCount > 0 && <Badge label={`👁️ ${spectatorCount}`} tone="electric" />}
+        </div>
         <Timer value={remaining} pressure={pressureLevel} className="text-4xl" />
         <div className="flex items-center gap-4">
           <Badge label={`Opponent: ${opponentStatus}`} tone="primary" />
@@ -112,6 +125,7 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
             isTimingOut={isTimingOut}
             submitLabel="Submit Solution"
             onSubmit={submit}
+            onCodeChange={(c, l) => updateMatchCode(matchId, c, l)}
             verdict={verdict}
             setVerdict={setVerdict}
             error={error}

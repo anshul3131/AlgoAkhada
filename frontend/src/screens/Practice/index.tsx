@@ -98,7 +98,6 @@ export function PracticeScreen({
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <Badge label={mode.toUpperCase()} tone="electric" />
-          <span className="font-mono text-sm text-text-secondary">problem/{problemId.slice(0, 8)}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={onBack}>Back to lobby</Button>

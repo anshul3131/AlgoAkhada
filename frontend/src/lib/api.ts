@@ -218,3 +218,23 @@ export const customMatchApi = {
 };
 
 
+export interface DashboardStats {
+  submissionStats: {
+    accepted: number;
+    wrongAnswer: number;
+    timeLimitExceeded: number;
+    runtimeError: number;
+    other: number;
+  };
+  matchStats: {
+    wins: number;
+    losses: number;
+  };
+  topicsStats: Record<string, number>;
+  eloHistory: Array<{ date: string; elo: number }>;
+}
+
+export const dashboardApi = {
+  getStats: () => request<DashboardStats>('/dashboard', { method: 'GET' }),
+  getLiveMatches: () => request<any[]>('/dashboard/live', { method: 'GET' }),
+};

@@ -6,6 +6,64 @@ import { customMatchApi, AuthUser } from '../../lib/api';
 import { useSocket, useRealtimeEvent } from '../../providers/RealtimeProvider';
 import { UserSearch } from './UserSearch';
 import { CustomLobbyRulesModal } from '../../components/shared/CreateCustomLobbyModal';
+import { ChatArena } from './ChatArena';
+import { useVoiceChat } from '../../hooks/useVoiceChat';
+import { Mic, MicOff, VolumeX, Volume2, User as UserIcon } from 'lucide-react';
+
+function VoiceActivityRing({ stream, children, isMuted }: { stream?: MediaStream | null, children: React.ReactNode, isMuted?: boolean }) {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  useEffect(() => {
+    if (!stream || isMuted) {
+      setIsSpeaking(false);
+      return;
+    }
+    let audioContext: AudioContext;
+    try {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch (e) {
+      return; // Web Audio API not supported
+    }
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.5;
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) return;
+    
+    const mediaStreamSource = audioContext.createMediaStreamSource(new MediaStream(audioTracks));
+    mediaStreamSource.connect(analyser);
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    let animationId: number;
+
+    const checkAudio = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const average = sum / dataArray.length;
+      
+      setIsSpeaking(average > 5);
+      animationId = requestAnimationFrame(checkAudio);
+    };
+    checkAudio();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      if (audioContext.state !== 'closed') {
+        audioContext.close().catch(() => {});
+      }
+    };
+  }, [stream, isMuted]);
+
+  return (
+    <div className={`relative rounded-full transition-all duration-150 ${isSpeaking ? 'shadow-[0_0_12px_rgba(34,197,94,0.8)] ring-2 ring-green-500 bg-green-500/10' : ''}`}>
+      {children}
+    </div>
+  );
+}
 
 export function CustomLobbyScreen({
   lobbyId,
@@ -20,8 +78,11 @@ export function CustomLobbyScreen({
 }) {
   const [lobby, setLobby] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isEditRulesModalOpen, setIsEditRulesModalOpen] = useState(false);
   const socket = useSocket();
+  
+  const { isMuted, isDeafened, toggleMute, toggleDeafen, remoteStreams, initiateConnection, isMediaReady, localStream } = useVoiceChat(lobbyId, currentUser.id);
 
   useEffect(() => {
     let active = true;
@@ -35,13 +96,23 @@ export function CustomLobbyScreen({
     };
     fetchLobby();
     
-    // Safety check: if user refreshed the page, join the socket room again
     if (socket) {
       socket.emit('custom_lobby_join', { lobbyId });
     }
 
     return () => { active = false; };
   }, [lobbyId, socket]);
+
+  // Connect to peers as they join
+  useEffect(() => {
+    if (lobby && lobby.participants && isMediaReady) {
+      lobby.participants.forEach((p: any) => {
+        if (p.userId !== currentUser.id && p.status === 'JOINED') {
+          initiateConnection(p.userId);
+        }
+      });
+    }
+  }, [lobby, currentUser.id, initiateConnection, isMediaReady]);
 
   useRealtimeEvent('custom_lobby_updated', (data) => {
     if (data.id === lobbyId) setLobby(data);
@@ -50,6 +121,13 @@ export function CustomLobbyScreen({
   useRealtimeEvent('custom_match_started', (data) => {
     if (data.id === lobbyId && data.problemId) {
       onMatchStart(data.problemId);
+    }
+  });
+
+  useRealtimeEvent('error', (payload) => {
+    if (payload?.message) {
+      setActionError(payload.message);
+      setTimeout(() => setActionError(null), 5000);
     }
   });
 
@@ -87,83 +165,136 @@ export function CustomLobbyScreen({
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-mono uppercase tracking-[0.2em] text-text-primary flex items-center gap-4">
-          <span><span className="text-accent-primary">#</span> Custom Match</span>
-          <Badge label={`JOIN CODE: ${lobby.joinCode}`} tone="primary" />
+    <div className="h-screen flex flex-col p-4 md:p-6 overflow-hidden max-w-[1600px] mx-auto">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between bg-bg-panel-raised p-4 rounded-xl border border-border-hairline">
+        <h1 className="text-xl md:text-2xl font-mono uppercase tracking-[0.2em] text-text-primary flex items-center gap-4">
+          <span className="text-accent-primary drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]">●</span> CUSTOM ARENA
         </h1>
-        <Button variant="ghost" onClick={handleLeave} className="text-xs tracking-widest uppercase">Leave Lobby</Button>
+        <div className="flex items-center gap-4">
+          <Badge label={`JOIN CODE: ${lobby.joinCode}`} tone="primary" />
+          <Button variant="ghost" onClick={handleLeave} className="text-[10px] tracking-widest uppercase !px-3">Leave</Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-6">
-          <GlowPanel>
-            <div className="mb-6 flex justify-between items-center border-b border-border-hairline pb-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">Topic</p>
-                <p className="text-lg text-text-primary font-medium">{lobby.topic}</p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center justify-end gap-2 mb-2">
-                  {isHost && (
-                    <Button 
-                      variant="ghost" 
-                      className="!px-3 !py-1 !text-[10px] border-dashed border-accent-primary text-accent-primary"
-                      onClick={() => setIsEditRulesModalOpen(true)}
-                    >
-                      EDIT RULES
-                    </Button>
-                  )}
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary">Match Rules</p>
-                </div>
-                <div className="flex justify-end items-center gap-2">
-                  <Badge label={`${lobby.timeLimit / 60} Min`} tone="electric" />
-                  <Badge label={`${lobby.participants.length} / ${lobby.maxParticipants} Players`} tone="primary" />
-                </div>
-              </div>
+      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-4 gap-4">
+        
+        {/* LEFT COLUMN: Match Config & Host Controls */}
+        <div className="md:col-span-1 flex flex-col gap-4 overflow-y-auto">
+          <GlowPanel className="flex flex-col gap-4">
+            <div className="border-b border-border-hairline pb-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">Topic</p>
+              <p className="text-lg text-accent-primary font-medium">{lobby.topic}</p>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary">Rules</p>
+              {isHost && (
+                <Button variant="ghost" className="!px-2 !py-1 !text-[9px] border-dashed border-accent-primary text-accent-primary" onClick={() => setIsEditRulesModalOpen(true)}>
+                  EDIT
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge label={`${lobby.timeLimit / 60} Min`} tone="electric" />
+              <Badge label={`Max ${lobby.maxParticipants} Players`} tone="primary" />
             </div>
 
-            <div className="mb-4">
-              <h2 className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-3">Participants ({lobby.participants?.length || 0})</h2>
-              <div className="space-y-2">
-                {lobby.participants?.map((p: any) => (
-                  <div key={p.userId} className="flex items-center justify-between rounded bg-bg-panel-raised p-3 border border-border-hairline">
-                    <span className="font-mono text-sm text-text-primary">{p.username} {p.userId === lobby.hostId && '(Host)'}</span>
-                    <Badge label={p.status} tone={p.status === 'JOINED' ? 'primary' : 'warn'} />
-                  </div>
-                ))}
-              </div>
+            <div className="mt-4 pt-4 border-t border-border-hairline">
+              {actionError && (
+                <div className="mb-4 rounded bg-accent-danger/20 border border-accent-danger p-3 text-center">
+                  <p className="text-xs text-accent-danger font-mono uppercase">{actionError}</p>
+                </div>
+              )}
+              {isHost ? (
+                <Button className="w-full text-sm py-4 animate-pulse-glow" onClick={handleStart}>LAUNCH BATTLE</Button>
+              ) : (
+                <div className="text-center py-4 border border-dashed border-border-hairline rounded bg-bg-void/50">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary animate-pulse">Awaiting Host...</p>
+                </div>
+              )}
             </div>
-            
-            {isHost && (
-              <div className="mt-8">
-                <Button className="w-full text-lg py-4" onClick={handleStart}>START MATCH</Button>
-              </div>
-            )}
-            {!isHost && (
-              <div className="mt-8 text-center py-4 border border-border-hairline rounded bg-bg-panel-raised">
-                <p className="text-xs uppercase tracking-[0.2em] text-text-secondary animate-pulse">Waiting for host to start...</p>
+          </GlowPanel>
+
+          <GlowPanel className="flex-1">
+            <h2 className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-4 flex items-center gap-2">
+              <UserIcon size={14} /> Invite Operatives
+            </h2>
+            {isHost ? (
+              <UserSearch lobbyId={lobbyId} />
+            ) : (
+              <div className="text-center p-4 text-xs text-text-secondary">
+                Only the host can invite others.
               </div>
             )}
           </GlowPanel>
         </div>
 
-        <div>
-          {isHost ? (
-            <GlowPanel>
-              <h2 className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">Invite Friends</h2>
-              <UserSearch lobbyId={lobbyId} />
-            </GlowPanel>
-          ) : (
-            <GlowPanel>
-              <div className="text-center p-6 text-sm text-text-secondary">
-                Only the host can invite other players. Hang tight!
+        {/* CENTER COLUMN: Chat Arena */}
+        <div className="md:col-span-2 flex flex-col min-h-0">
+          <ChatArena lobbyId={lobbyId} currentUserId={currentUser.id} participants={lobby.participants} />
+        </div>
+
+        {/* RIGHT COLUMN: Participants & Voice Comm */}
+        <div className="md:col-span-1 flex flex-col min-h-0">
+          <GlowPanel className="flex flex-col h-full !p-0">
+            <div className="bg-bg-panel-raised p-4 border-b border-border-hairline flex justify-between items-center">
+              <h2 className="text-[10px] uppercase tracking-[0.2em] text-text-secondary">Squad ({lobby.participants?.length || 0})</h2>
+              
+              <div className="flex gap-2">
+                <button 
+                  onClick={toggleDeafen}
+                  className={`p-1.5 rounded transition ${isDeafened ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-white'}`}
+                  title={isDeafened ? 'Undeafen' : 'Deafen'}
+                >
+                  {isDeafened ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                </button>
+                <button 
+                  onClick={toggleMute}
+                  className={`p-1.5 rounded transition ${isMuted ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-white'}`}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                </button>
               </div>
-            </GlowPanel>
-          )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {lobby.participants?.map((p: any) => {
+                const stream = remoteStreams[p.userId];
+                // Hidden audio element for voice chat playback
+                return (
+                  <div key={p.userId} className="flex items-center justify-between rounded bg-bg-void p-3 border border-border-hairline relative overflow-hidden group">
+                    {stream && !isDeafened && (
+                      <audio autoPlay ref={(audio) => { if (audio) audio.srcObject = stream; }} />
+                    )}
+                    <div className="flex items-center gap-3 relative z-10">
+                      <VoiceActivityRing stream={p.userId === currentUser.id ? localStream : stream} isMuted={p.userId === currentUser.id ? isMuted : false}>
+                        <div className="relative">
+                          <div className="w-8 h-8 rounded-full bg-bg-panel-raised flex items-center justify-center border border-border-hairline text-text-primary uppercase font-bold text-xs">
+                            {p.username.substring(0, 2)}
+                          </div>
+                          {/* Status indicator */}
+                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-bg-void ${p.status === 'JOINED' ? 'bg-accent-primary' : 'bg-accent-warn'}`}></div>
+                        </div>
+                      </VoiceActivityRing>
+                      <div className="flex flex-col">
+                        <span className="font-mono text-sm text-text-primary flex items-center gap-2">
+                          {p.username} 
+                          {p.userId === lobby.hostId && <span className="text-[8px] tracking-widest text-accent-electric border border-accent-electric px-1 rounded">HOST</span>}
+                        </span>
+                        <span className="text-[9px] text-text-secondary uppercase">{p.status}</span>
+                      </div>
+                    </div>
+                    {stream && (
+                       <Mic size={14} className="text-accent-primary animate-pulse" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </GlowPanel>
         </div>
       </div>
+
       <CustomLobbyRulesModal 
         isOpen={isEditRulesModalOpen}
         onClose={() => setIsEditRulesModalOpen(false)}
@@ -179,3 +310,4 @@ export function CustomLobbyScreen({
     </div>
   );
 }
+

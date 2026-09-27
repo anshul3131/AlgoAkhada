@@ -1,3 +1,5 @@
+import { Sun, Moon } from "lucide-react";
+
 import { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import js_beautify from 'js-beautify';
@@ -20,6 +22,7 @@ interface CodeWorkspaceProps {
   isTimingOut?: boolean;
   submitLabel?: string;
   onSubmit: (language: string, code: string) => void;
+  onCodeChange?: (code: string, language: string) => void;
   
   verdict: string;
   setVerdict: (v: string) => void;
@@ -45,6 +48,7 @@ export function CodeWorkspace({
   isTimingOut = false,
   submitLabel = 'Submit Solution',
   onSubmit,
+  onCodeChange,
   verdict,
   setVerdict,
   error,
@@ -58,9 +62,18 @@ export function CodeWorkspace({
   initialLanguage
 }: CodeWorkspaceProps) {
   const [language, setLanguage] = useState('C++');
+  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
   const [codeMap, setCodeMap] = useState<Record<string, string>>(boilerplates);
   const code = codeMap[language] ?? boilerplates[language] ?? '';
-  const setCode = (val: string) => setCodeMap(prev => ({ ...prev, [language]: val }));
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const setCode = (val: string) => { 
+    setCodeMap(prev => ({ ...prev, [language]: val })); 
+    
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onCodeChange?.(val, language);
+    }, 500);
+  };
   const editorRef = useRef<any>(null);
 
   useEffect(() => {
@@ -142,6 +155,9 @@ export function CodeWorkspace({
             {languages.length > 0 ? languages.map(lang => <option key={lang.id} value={lang.id}>{lang.name}</option>) : <option value="C++">C++</option>}
           </select>
           <Button variant="ghost" onClick={formatCode} className="px-3 text-xs">Beautify</Button>
+          <Button variant="ghost" onClick={() => setEditorTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')} className="px-2" title="Toggle Editor Theme">
+            {editorTheme === 'vs-dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </Button>
           <Badge label={isSubmitting ? 'Evaluating' : 'Draft saved locally'} tone={isSubmitting ? 'warn' : 'primary'} />
         </div>
         <div className="flex gap-2">
@@ -157,6 +173,7 @@ export function CodeWorkspace({
       <GlowPanel className="p-0 overflow-hidden min-h-[390px] border border-border-hairline">
           <Editor
             height="400px"
+            theme={editorTheme}
             language={monacoLanguage}
             value={code}
             onChange={(val) => setCode(val || '')}

@@ -19,10 +19,10 @@ export class RecentMatchController {
 
         const serviceResponse = await recentMatchService.getRecentMatches(userId, limit, res);
         if(serviceResponse.responseCode===RESPONSE_CODES.SUCCESS_HTTP_CODE){
-            res.status(serviceResponse.responseCode).send({success : true,data : serviceResponse.data})
+            return res.status(serviceResponse.responseCode).send({success : true,data : serviceResponse.data});
         }
         else{
-            res.status(serviceResponse.responseCode).send({success : false,data : serviceResponse.data})
+            return res.status(serviceResponse.responseCode).send({success : false,data : serviceResponse.data});
         }
     }
 
@@ -34,9 +34,9 @@ export class RecentMatchController {
         const userId = req.user.id;
         const serviceResponse = await recentMatchService.getUserStats(userId);
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE){
-            res.status(serviceResponse.responseCode).send({success: true, data: serviceResponse.data});
+            return res.status(serviceResponse.responseCode).send({success: true, data: serviceResponse.data});
         } else {
-            res.status(serviceResponse.responseCode).send({success: false, data: serviceResponse.data});
+            return res.status(serviceResponse.responseCode).send({success: false, data: serviceResponse.data});
         }
     }
 }

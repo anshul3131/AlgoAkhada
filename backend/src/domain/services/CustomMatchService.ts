@@ -110,14 +110,21 @@ export class CustomMatchService {
             const match = await customMatchRepository.getMatchById(matchId);
             if (!match) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
 
+            const participantToRemove = match.participants?.find(p => p.user.id === userId);
+            if (participantToRemove) {
+                await customMatchParticipantRepository.delete(participantToRemove.id);
+            }
+
             match.participants = match.participants?.filter(p => p.user.id !== userId);
 
             if (match.host?.id === userId && match.participants && match.participants.length > 0) {
                 match.host = match.participants[0]!.user;
+                await customMatchRepository.saveEntity(match);
+            } else if (match.participants?.length === 0) {
+                // If lobby empty, maybe we could delete the match, but for now just leave it
+                await customMatchRepository.saveEntity(match);
             }
 
-            await customMatchRepository.saveEntity(match);
-            
             const payload = await this.getLobbyDTO(matchId);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error) {

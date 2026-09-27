@@ -60,6 +60,7 @@ export interface RecentMatchRecord {
 export interface SubmissionDetailRecord {
   submissionId: string;
   problemId: string;
+  problemTitle?: string;
   language: string;
   code: string;
   status: string;
@@ -95,6 +96,15 @@ export interface RealtimeEventMap {
   custom_lobby_left: { lobbyId: string; userId: string };
   custom_match_result: { lobbyId: string; result: string };
   custom_lobby_submission: { lobbyId: string; userId: string; username: string; status: string; score: number; passed: number; total: number; compileError?: string };
+  custom_lobby_chat_message: { userId: string; username: string; message: string; timestamp: string };
+  custom_lobby_chat_typing: { userId: string; username: string; isTyping: boolean };
+  webrtc_offer: { senderId: string; offer: RTCSessionDescriptionInit };
+  webrtc_answer: { senderId: string; answer: RTCSessionDescriptionInit };
+  webrtc_ice_candidate: { senderId: string; candidate: RTCIceCandidateInit };
+  rematch_requested: void;
+  rematch_declined: void;
+  spectator_count: number;
+  spectator_code_update: { userId: string; username: string; code: string; language: string };
   error: { message: string };
 }
 

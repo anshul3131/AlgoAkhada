@@ -3,6 +3,7 @@ import { SubmissionStatus } from "../entities/Submission";
 export class SubmissionDTO {
     submissionId: string;
     problemId: string;
+    problemTitle?: string;
     language: string;
     code: string;
     status: SubmissionStatus;

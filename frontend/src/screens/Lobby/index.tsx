@@ -3,7 +3,7 @@ import { Badge } from '../../components/shared/Badge';
 import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { OdometerNumber } from '../../components/shared/OdometerNumber';
-import { matchApi, problemApi } from '../../lib/api';
+import { matchApi, problemApi, dashboardApi } from '../../lib/api';
 import type { Player, RecentMatchRecord } from '../../types';
 import { CustomLobbyRulesModal } from '../../components/shared/CreateCustomLobbyModal';
 
@@ -26,6 +26,8 @@ export function LobbyDashboard({
   onUpsolve,
   onCreateCustomLobby,
   onJoinByCode,
+  onDashboard,
+  onSpectate,
   externalError,
 }: {
   onFindMatch: () => void;
@@ -37,9 +39,12 @@ export function LobbyDashboard({
   onUpsolve: (problemId: string) => void;
   onCreateCustomLobby: (lobbyId: string) => void;
   onJoinByCode: (code: string) => void;
+  onDashboard: () => void;
+  onSpectate: (matchId: string, problemId: string, players?: {id: string, username: string}[]) => void;
   externalError?: string | null;
 }) {
   const [recentMatches, setRecentMatches] = useState<RecentMatchRecord[]>([]);
+  const [liveMatches, setLiveMatches] = useState<any[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
@@ -88,15 +93,17 @@ export function LobbyDashboard({
       setError(null);
 
       try {
-        const [matches, userStats, tagsData] = await Promise.all([
+        const [matches, userStats, tagsData, liveData] = await Promise.all([
           matchApi.getRecentMatches(5),
           matchApi.getUserStats(),
-          problemApi.getTags()
+          problemApi.getTags(),
+          dashboardApi.getLiveMatches()
         ]);
         if (!isCancelled) {
           setRecentMatches(matches);
           setStats(userStats);
           setTags(tagsData.tags);
+          setLiveMatches(liveData);
         }
       } catch (caughtError) {
         if (!isCancelled) {
@@ -123,10 +130,11 @@ export function LobbyDashboard({
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-secondary">CP MatchMaker / {username ?? mockPlayer.handle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <Badge label="Season 04" tone="electric" />
           <Badge label="Live Queue" tone="primary" />
-          {onLogout && <button onClick={onLogout} className="text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-danger">Logout</button>}
+          <button onClick={onDashboard} className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-primary hover:text-white transition-colors">Dashboard</button>
+          {onLogout && <button onClick={onLogout} className="text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-danger transition-colors">Logout</button>}
         </div>
       </div>
 
@@ -254,6 +262,31 @@ export function LobbyDashboard({
                 >
                   {tag}
                 </button>
+              ))
+            )}
+          </div>
+        </GlowPanel>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Live Matches (Spectate)</p>
+        </div>
+        <GlowPanel className="p-3">
+          <div className="flex flex-col gap-2">
+            {liveMatches.length === 0 ? (
+              <span className="text-sm text-text-secondary p-4 text-center block">No live matches currently available.</span>
+            ) : (
+              liveMatches.map((match) => (
+                <div key={match.matchId} className="flex items-center justify-between rounded-lg bg-bg-panel-raised p-3">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-sm text-text-primary">
+                      {match.user1.username} ({match.user1.elo || 1200}) vs {match.user2.username} ({match.user2.elo || 1200})
+                    </span>
+                    <span className="text-xs text-text-secondary">{match.problemTitle}</span>
+                  </div>
+                  <Button variant="ghost" onClick={() => onSpectate(match.matchId, match.problemId, [match.user1, match.user2])}>Spectate</Button>
+                </div>
               ))
             )}
           </div>

@@ -61,10 +61,10 @@ export class SubmissionController {
     ) {
         const serviceResponse = await submissionService.getSubmissionById(submissionId);
         if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data })
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
         }
         else {
-            res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data })
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 }

@@ -79,6 +79,7 @@ export class SubmissionService {
             const data: SubmissionDTO = {
                 submissionId: submission.id,
                 problemId: submission.problem ? submission.problem.id : "",
+                problemTitle: submission.problem ? submission.problem.title : "",
                 language: submission.language,
                 code: submission.code,
                 status: submission.status

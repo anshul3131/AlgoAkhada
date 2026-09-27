@@ -11,9 +11,13 @@ import { redisClient } from "./infrastructure/redis/RedisClient";
 import { matchmakerService } from "./domain/services/MatchmakerService";
 import { matchService } from "./domain/services/MatchService";
 import { customMatchService } from "./domain/services/CustomMatchService";
+import { matchRepository } from "./infrastructure/database/repositories/MatchRepository";
+
 import { customMatchRepository } from "./infrastructure/database/repositories/CustomMatchRepository";
 import { customMatchParticipantRepository } from "./infrastructure/database/repositories/CustomMatchParticipantRepository";
 import { MatchStatus } from "./domain/enums/MatchStatus";
+import { userRepository } from "./infrastructure/database/repositories/UserRepository";
+
 import { CustomParticipantStatus } from "./domain/enums/CustomParticipantStatus";
 
 async function startServer(): Promise<void> {
@@ -145,6 +149,29 @@ async function startServer(): Promise<void> {
                 const matchRoom = `match:${matchId}`;
                 socket.join(matchRoom);
                 console.log(`Socket ${socket.id} joined match room: ${matchRoom}`);
+                const roomSize = io.sockets.adapter.rooms.get(matchRoom)?.size || 0;
+                const spectatorCount = Math.max(0, roomSize - 2);
+                io.to(matchRoom).emit('spectator_count', spectatorCount);
+            });
+
+            socket.on('leave_match', (matchId: string) => {
+                const matchRoom = `match:${matchId}`;
+                socket.leave(matchRoom);
+                console.log(`Socket ${socket.id} left match room: ${matchRoom}`);
+                const roomSize = io.sockets.adapter.rooms.get(matchRoom)?.size || 0;
+                const spectatorCount = Math.max(0, roomSize - 2);
+                io.to(matchRoom).emit('spectator_count', spectatorCount);
+            });
+
+            socket.on('match_code_update', (data: { matchId: string, code: string, language: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !data.matchId) return;
+                socket.to(`match:${data.matchId}`).emit('spectator_code_update', {
+                    userId,
+                    username: socket.data.user?.username,
+                    code: data.code,
+                    language: data.language
+                });
             });
 
             socket.on('join_queue', async (data?: { tag?: string }) => {
@@ -174,6 +201,39 @@ async function startServer(): Promise<void> {
                 if (!userId || !matchId) return;
 
                 await matchService.finishMatchByTimeout(matchId, userId);
+            });
+
+            socket.on('propose_rematch', async (data: { matchId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !data.matchId) return;
+
+                const match = await matchRepository.findOne({ where: { id: data.matchId }, relations: { user1: true, user2: true, problem: true } });
+                if (!match) return;
+
+                const opponentId = match.user1.id === userId ? match.user2.id : match.user1.id;
+                const rematchKey = `rematch:${data.matchId}`;
+                const existing = await redisClient.client.get(rematchKey);
+
+                if (existing && existing !== userId) {
+                    await redisClient.client.del(rematchKey);
+                    
+                    const tag = match.problem?.tags?.[0] || 'GENERIC';
+                    await matchmakerService.createMatch(userId, opponentId, tag);
+                } else {
+                    await redisClient.client.set(rematchKey, userId, { EX: 60 });
+                    io.to(`user:${opponentId}`).emit('rematch_requested');
+                }
+            });
+
+            socket.on('decline_rematch', async (data: { matchId: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !data.matchId) return;
+                const match = await matchRepository.findOne({ where: { id: data.matchId }, relations: { user1: true, user2: true } });
+                if (!match) return;
+                const opponentId = match.user1.id === userId ? match.user2.id : match.user1.id;
+                const rematchKey = `rematch:${data.matchId}`;
+                await redisClient.client.del(rematchKey);
+                io.to(`user:${opponentId}`).emit('rematch_declined');
             });
 
             socket.on('custom_lobby_leave_match', async (data: { lobbyId: string }) => {
@@ -326,12 +386,76 @@ async function startServer(): Promise<void> {
                 }
             });
 
+            socket.on('custom_lobby_chat_message', async (data: { lobbyId: string, message: string }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+
+                const user = await userRepository.getUserById(userId);
+                if (!user) return;
+
+                io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_chat_message', {
+                    userId,
+                    username: user.username,
+                    message: data.message,
+                    timestamp: new Date().toISOString()
+                });
+            });
+
+            socket.on('custom_lobby_chat_typing', (data: { lobbyId: string, isTyping: boolean }) => {
+                const userId = socket.data.user?.id;
+                if (!userId || !data.lobbyId) return;
+
+                socket.to(`lobby:${data.lobbyId}`).emit('custom_lobby_chat_typing', {
+                    userId,
+                    username: socket.data.user?.username,
+                    isTyping: data.isTyping
+                });
+            });
+
+            // WebRTC Signaling
+            socket.on('webrtc_offer', (data: { targetUserId: string, lobbyId: string, offer: RTCSessionDescriptionInit }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                io.to(`user:${data.targetUserId}`).emit('webrtc_offer', {
+                    senderId: userId,
+                    offer: data.offer
+                });
+            });
+
+            socket.on('webrtc_answer', (data: { targetUserId: string, lobbyId: string, answer: RTCSessionDescriptionInit }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                io.to(`user:${data.targetUserId}`).emit('webrtc_answer', {
+                    senderId: userId,
+                    answer: data.answer
+                });
+            });
+
+            socket.on('webrtc_ice_candidate', (data: { targetUserId: string, lobbyId: string, candidate: RTCIceCandidateInit }) => {
+                const userId = socket.data.user?.id;
+                if (!userId) return;
+                io.to(`user:${data.targetUserId}`).emit('webrtc_ice_candidate', {
+                    senderId: userId,
+                    candidate: data.candidate
+                });
+            });
+
             socket.on('custom_lobby_forfeit', async (data: { lobbyId: string }) => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;
 
                 await customMatchService.forfeitMatch(data.lobbyId, userId);
                 io.to(`user:${userId}`).emit('custom_match_result', { lobbyId: data.lobbyId, result: 'FORFEIT' });
+            });
+
+            socket.on('disconnecting', () => {
+                for (const room of socket.rooms) {
+                    if (room.startsWith('match:')) {
+                        const roomSize = io.sockets.adapter.rooms.get(room)?.size || 1;
+                        const spectatorCount = Math.max(0, roomSize - 1 - 2);
+                        io.to(room).emit('spectator_count', spectatorCount);
+                    }
+                }
             });
         });
 
