@@ -1,3 +1,5 @@
+import { Submission } from "../entities/Submission";
+
 import { Problem, ProblemDifficulty } from "../entities/Problem";
 import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
 import { submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
@@ -94,6 +96,15 @@ export class ProblemService {
             };
 
             if (userId) {
+                const subRepo = AppDataSource.getRepository(Submission);
+                const pastSubs = await subRepo.find({
+                    where: { problem: { id }, user: { id: userId } },
+                    order: { submittedAt: 'DESC' },
+                    select: { id: true, status: true, language: true, submittedAt: true, executionTimeMs: true }
+                });
+                if (pastSubs.length > 0) {
+                    payload.pastSubmissions = pastSubs;
+                }
                 const sub = await submissionRepository.getLastAcceptedSubmission(id, userId);
                 if (sub) {
                     payload.lastSubmission = { code: sub.code, language: sub.language };

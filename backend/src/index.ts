@@ -266,29 +266,35 @@ async function startServer(): Promise<void> {
                 socket.emit('queue_status', { status: 'left' });
                 console.log(`User ${userId} left the queue.`);
             });
+            const broadcastPublicLobbies = async () => {
+                const res = await customMatchService.getPublicLobbies();
+                io.emit('public_lobbies_updated', res.data);
+            };
 
             // --- Custom Lobbies ---
-            socket.on('custom_lobby_create', async (data: { topic: string, timeLimit: number, maxParticipants: number }) => {
+            socket.on('custom_lobby_create', async (data: { topic: string, timeLimit: number, maxParticipants: number, name?: string, difficulty?: string, isPublic?: boolean }) => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;
                 
-                const response = await customMatchService.createLobby(userId, data.topic, data.timeLimit, data.maxParticipants);
+                const response = await customMatchService.createLobby(userId, data.topic, data.timeLimit, data.maxParticipants, data.name, data.difficulty, data.isPublic);
                 if (response.responseCode < 400 && response.data) {
                     const lobbyId = response.data.id;
                     socket.join(`lobby:${lobbyId}`);
                     socket.emit('custom_lobby_updated', response.data);
+                    broadcastPublicLobbies();
                 } else {
                     socket.emit('error', { message: response.data || 'Failed to create lobby' });
                 }
             });
 
-            socket.on('custom_lobby_update', async (data: { lobbyId: string, topic: string, timeLimit: number, maxParticipants: number }) => {
+            socket.on('custom_lobby_update', async (data: { lobbyId: string, topic: string, timeLimit: number, maxParticipants: number, isPublic?: boolean }) => {
                 const userId = socket.data.user?.id;
                 if (!userId) return;
 
                 const response = await customMatchService.updateLobby(data.lobbyId, userId, data);
                 if (response.responseCode < 400 && response.data) {
                     io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                    broadcastPublicLobbies();
                 } else {
                     socket.emit('error', { message: response.data || 'Failed to update lobby' });
                 }
@@ -314,6 +320,7 @@ async function startServer(): Promise<void> {
                     socket.join(`lobby:${data.lobbyId}`);
                     // Broadcast updated lobby to everyone in the room
                     io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                    broadcastPublicLobbies();
                 } else {
                     socket.emit('error', { message: response.data || 'Failed to join lobby' });
                 }
@@ -327,6 +334,7 @@ async function startServer(): Promise<void> {
                 if (response.responseCode < 400 && response.data) {
                     socket.join(`lobby:${response.data.id}`);
                     io.to(`lobby:${response.data.id}`).emit('custom_lobby_updated', response.data);
+                    broadcastPublicLobbies();
                     socket.emit('custom_lobby_joined', response.data);
                 } else {
                     socket.emit('error', { message: response.data || 'Failed to join lobby' });
@@ -370,6 +378,7 @@ async function startServer(): Promise<void> {
                 const response = await customMatchService.leaveLobby(data.lobbyId, userId);
                 if (response.responseCode < 400 && response.data) {
                     io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_updated', response.data);
+                    broadcastPublicLobbies();
                     io.to(`lobby:${data.lobbyId}`).emit('custom_lobby_left', { lobbyId: data.lobbyId, userId });
                 }
             });
@@ -381,6 +390,7 @@ async function startServer(): Promise<void> {
                 const response = await customMatchService.startMatch(data.lobbyId, userId);
                 if (response.responseCode < 400 && response.data) {
                     io.to(`lobby:${data.lobbyId}`).emit('custom_match_started', response.data);
+                    broadcastPublicLobbies();
                 } else {
                     socket.emit('error', { message: response.data || 'Failed to start match' });
                 }

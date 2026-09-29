@@ -26,6 +26,15 @@ export class CustomMatch {
     @Column({ type: "varchar", length: 6, unique: true })
     joinCode: string;
 
+    @Column({ type: "varchar", default: "Custom Match" })
+    name: string;
+
+    @Column({ type: "varchar", default: "Medium" })
+    difficulty: string;
+
+    @Column({ type: "boolean", default: false })
+    isPublic: boolean;
+
     @Column({ type: "varchar" })
     topic: string;
 

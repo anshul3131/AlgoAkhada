@@ -6,6 +6,17 @@ import { OdometerNumber } from '../../components/shared/OdometerNumber';
 import { matchApi, problemApi, dashboardApi } from '../../lib/api';
 import type { Player, RecentMatchRecord } from '../../types';
 import { CustomLobbyRulesModal } from '../../components/shared/CreateCustomLobbyModal';
+import { PublicLobbiesPanel } from '../../components/shared/PublicLobbiesPanel';
+
+const ChevronStack = ({ up }: { up?: boolean }) => (
+  <div className="flex flex-col items-center justify-center -space-y-[3px]">
+    {[0, 1, 2].map(i => (
+      <svg key={i} width="14" height="6" viewBox="0 0 24 10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <path d={up ? "M2 8l10-6 10 6" : "M2 2l10 6 10-6"} />
+      </svg>
+    ))}
+  </div>
+);
 
 const mockPlayer: Player = {
   id: 'you',
@@ -20,6 +31,7 @@ export function LobbyDashboard({
   onFindMatch,
   onExploreTags,
   username,
+  avatarUrl,
   elo,
   onLogout,
   onReviewSolution,
@@ -34,6 +46,7 @@ export function LobbyDashboard({
   onExploreTags: (tag?: string) => void;
   username?: string;
   elo?: number;
+  avatarUrl?: string | null;
   onLogout?: () => void;
   onReviewSolution: (submissionId: string) => void;
   onUpsolve: (problemId: string) => void;
@@ -46,6 +59,7 @@ export function LobbyDashboard({
   const [recentMatches, setRecentMatches] = useState<RecentMatchRecord[]>([]);
   const [liveMatches, setLiveMatches] = useState<any[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,62 +139,76 @@ export function LobbyDashboard({
   }, []);
 
   return (
+    
     <div className="mx-auto max-w-[1400px] p-4 md:p-6">
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-border-hairline bg-bg-panel p-3">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-secondary">CP MatchMaker / {username ?? mockPlayer.handle}</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Badge label="Season 04" tone="electric" />
-          <Badge label="Live Queue" tone="primary" />
-          <button onClick={onDashboard} className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-primary hover:text-white transition-colors">Dashboard</button>
-          {onLogout && <button onClick={onLogout} className="text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-danger transition-colors">Logout</button>}
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-        <GlowPanel className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-[0.22em] text-text-secondary">Rank Card</p>
-            <Badge label={mockPlayer.tier} tone="electric" />
-          </div>
-          <OdometerNumber value={currentElo} className="text-5xl text-accent-primary" />
-          <div className="h-2 rounded-full bg-bg-panel-raised">
-            <div className="h-full rounded-full bg-accent-primary" style={{ width: `${rankProgress}%` }} />
-          </div>
-          <div className="flex justify-between text-xs uppercase tracking-[0.2em] text-text-secondary">
-            <span>Wins {stats.wins}</span>
-            <span>Losses {stats.losses}</span>
+      <div
+        className="
+          grid gap-4
+          lg:h-[calc(100vh-6rem)] lg:min-h-[720px] lg:max-h-[940px]
+          lg:grid-cols-12 lg:grid-rows-[auto_minmax(0,1fr)_auto]
+        "
+      >
+        {/* 1. MATCHMAKING ACTIONS */}
+        <GlowPanel className="p-5 lg:col-span-8 lg:row-start-1">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] h-full">
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2">
+                {['Ranked 1v1', 'Casual', 'Blitz'].map((mode) => (
+                  <button
+                    key={mode}
+                    className="rounded-full border border-border-hairline px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-text-secondary"
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+              <Button className="h-24 md:h-28 w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
+              {!isJoinLobbyModalOpen && displayError && <div className="text-accent-danger text-xs text-center uppercase tracking-widest">{displayError}</div>}
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em] w-full" onClick={() => onExploreTags()}>Browse Topics</Button>
+              <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em] w-full" onClick={() => setIsJoinLobbyModalOpen(true)}>Join Lobby</Button>
+              <Button variant="primary" className="text-[10px] uppercase tracking-[0.2em] w-full" onClick={() => setIsCustomLobbyModalOpen(true)}>Create Custom Match</Button>
+            </div>
           </div>
         </GlowPanel>
 
-        <GlowPanel className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            {['Ranked 1v1', 'Casual', 'Blitz'].map((mode) => (
-              <button
-                key={mode}
-                className="rounded-full border border-border-hairline px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-text-secondary"
-              >
-                {mode}
-              </button>
-            ))}
+        {/* 2. PUBLIC LOBBIES */}
+        <PublicLobbiesPanel className="max-lg:h-[360px] lg:col-span-4 lg:row-start-2" onJoinCode={onJoinByCode} />
+
+        {/* 3. LIVE MATCHES */}
+        <GlowPanel className="max-lg:h-[360px] lg:col-span-4 lg:col-start-5 lg:row-start-2 flex min-h-0 flex-col p-3">
+          <div className="mb-3 flex items-center justify-between flex-shrink-0">
+            <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Live Matches (Spectate)</p>
           </div>
-          <Button className="h-[200px] w-full text-3xl" onClick={() => onFindMatch()}>Find Match</Button>
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={() => onExploreTags()}>Browse Topics</Button>
-            <Button variant="ghost" className="text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsJoinLobbyModalOpen(true)}>Join Lobby</Button>
-            <Button variant="primary" className="col-span-2 text-[10px] uppercase tracking-[0.2em]" onClick={() => setIsCustomLobbyModalOpen(true)}>Create Custom Match</Button>
+          <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto pr-2">
+            {(liveMatches || []).length === 0 ? (
+              <span className="text-sm text-text-secondary p-4 text-center block italic">No live matches currently available.</span>
+            ) : (
+              (liveMatches || []).map((match) => (
+                <div key={match.matchId} className="flex items-center justify-between rounded-lg bg-bg-void border border-border-hairline p-3">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[10px] text-text-primary uppercase truncate max-w-[120px]">
+                      {match.user1?.username} vs {match.user2?.username}
+                    </span>
+                    <span className="text-[9px] text-text-secondary uppercase truncate max-w-[120px]">{match.problemTitle}</span>
+                  </div>
+                  <Button variant="ghost" className="!px-2 !py-1 text-[9px] tracking-widest uppercase h-fit flex-shrink-0" onClick={() => onSpectate(match.matchId, match.problemId, [match.user1, match.user2])}>Spectate</Button>
+                </div>
+              ))
+            )}
           </div>
-          {!isJoinLobbyModalOpen && displayError && <div className="text-accent-danger text-xs text-center uppercase tracking-widest">{displayError}</div>}
         </GlowPanel>
 
-        <GlowPanel className="max-h-[480px] overflow-hidden">
-          <div className="mb-4 flex items-center justify-between">
+        {/* 4. RECENTLY PLAYED */}
+        <GlowPanel className="max-lg:h-[420px] lg:col-span-4 lg:col-start-9 lg:row-span-2 lg:row-start-1 flex min-h-0 flex-col p-3">
+          <div className="mb-4 flex items-center justify-between flex-shrink-0">
             <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Recently Played</p>
             <Badge label="Live" tone="primary" />
           </div>
 
-          <div className="space-y-2 max-h-[290px] overflow-y-auto pr-2">
+          <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-2">
             {isLoadingMatches ? (
               <div className="rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-4 text-sm text-text-secondary">Loading matches...</div>
             ) : error ? (
@@ -190,105 +218,76 @@ export function LobbyDashboard({
             ) : (
               recentMatches.map((match, index) => {
                 const isWin = match.result === 'WIN';
-                const buttonText = isWin ? 'View your solution' : 'Upsolve';
-                const isButtonDisabled = isWin ? !match.submissionId : false;
-
+                
                 return (
                   <div
                     key={match.matchId}
-                    className={`rounded-xl border p-3 transition-all ${
+                    className={`rounded-xl border p-3 transition-all flex flex-col gap-2 ${
                       isWin
-                        ? 'border-accent-primary/60 bg-accent-primary/10 shadow-[0_0_0_1px_rgba(76,255,190,0.12)]'
-                        : 'border-accent-danger/50 bg-accent-danger/10 shadow-[0_0_0_1px_rgba(255,92,92,0.08)]'
+                        ? 'border-accent-primary/40 bg-accent-primary/5 hover:border-accent-primary/60'
+                        : 'border-accent-danger/40 bg-accent-danger/5 hover:border-accent-danger/60'
                     }`}
                   >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-secondary">#{index + 1}</span>
-                        <span className="font-mono text-sm text-text-primary">{match.opponentName}</span>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-bold text-text-primary">{match.opponentName}</span>
                       <span
-                        className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${
-                          isWin
-                            ? 'border-accent-primary/50 bg-accent-primary/20 text-accent-primary'
-                            : 'border-accent-danger/50 bg-accent-danger/20 text-accent-danger'
+                        className={`font-bold text-xs ${
+                          isWin ? 'text-accent-primary' : 'text-accent-danger'
                         }`}
                       >
                         {match.result}
                       </span>
                     </div>
 
-                    <div className="mb-3 text-[10px] uppercase tracking-[0.18em] text-text-secondary">{match.problemTitle}</div>
-
-                    <Button
-                      variant={isWin ? 'primary' : 'danger'}
-                      className="w-full text-[10px] text-[11px] font-medium tracking-[0.18em]"
+                    <button 
                       onClick={() => {
                         if (isWin && match.submissionId) {
                           onReviewSolution(match.submissionId);
-                          return;
+                        } else {
+                          onUpsolve(match.problemId);
                         }
-                        onUpsolve(match.problemId);
                       }}
-                      disabled={isButtonDisabled}
+                      className="text-[11px] text-left uppercase tracking-[0.1em] text-text-secondary hover:text-white hover:underline truncate"
+                      title={match.problemTitle}
                     >
-                      {buttonText}
-                    </Button>
+                      {match.problemTitle}
+                    </button>
                   </div>
                 );
               })
             )}
           </div>
         </GlowPanel>
-      </div>
 
-      <div className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Topics</p>
-          <button onClick={() => onExploreTags()} className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-primary hover:text-accent-primary/80">Open all</button>
-        </div>
-        <GlowPanel className="p-3">
-          <div className="flex flex-wrap gap-2">
-            {isLoadingTags ? (
-              <span className="text-sm text-text-secondary">Loading topics...</span>
-            ) : tags.length === 0 ? (
-              <span className="text-sm text-text-secondary">No topics available.</span>
-            ) : (
-              tags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => onExploreTags(tag)}
-                  className="rounded-full border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-primary transition hover:border-accent-primary hover:text-accent-primary"
-                >
-                  {tag}
-                </button>
-              ))
-            )}
+        {/* 5. TOPICS */}
+        <GlowPanel className="lg:col-span-12 lg:row-start-3 flex min-h-0 flex-col p-3">
+          <div className="mb-3 flex items-center justify-between flex-shrink-0">
+            <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Topics</p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setTopicsExpanded(!topicsExpanded)} className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-text-primary transition-colors flex items-center gap-2">
+                <ChevronStack up={topicsExpanded} />
+                {topicsExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            </div>
           </div>
-        </GlowPanel>
-      </div>
-
-      <div className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary">Live Matches (Spectate)</p>
-        </div>
-        <GlowPanel className="p-3">
-          <div className="flex flex-col gap-2">
-            {liveMatches.length === 0 ? (
-              <span className="text-sm text-text-secondary p-4 text-center block">No live matches currently available.</span>
-            ) : (
-              liveMatches.map((match) => (
-                <div key={match.matchId} className="flex items-center justify-between rounded-lg bg-bg-panel-raised p-3">
-                  <div className="flex flex-col">
-                    <span className="font-mono text-sm text-text-primary">
-                      {match.user1.username} ({match.user1.elo || 1200}) vs {match.user2.username} ({match.user2.elo || 1200})
-                    </span>
-                    <span className="text-xs text-text-secondary">{match.problemTitle}</span>
-                  </div>
-                  <Button variant="ghost" onClick={() => onSpectate(match.matchId, match.problemId, [match.user1, match.user2])}>Spectate</Button>
-                </div>
-              ))
-            )}
+          <div className={`${topicsExpanded ? 'max-h-[132px] overflow-y-auto' : 'max-h-[34px] overflow-hidden'} pr-2 transition-all duration-300 ease-in-out`}>
+            <div className="flex flex-wrap gap-2">
+              {isLoadingTags ? (
+                <span className="text-sm text-text-secondary">Loading topics...</span>
+              ) : tags.length === 0 ? (
+                <span className="text-sm text-text-secondary">No topics available.</span>
+              ) : (
+                tags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => onExploreTags(tag)}
+                    className="rounded-full border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-primary transition hover:border-accent-primary hover:text-accent-primary"
+                  >
+                    {tag}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </GlowPanel>
       </div>
@@ -345,5 +344,6 @@ export function LobbyDashboard({
         </div>
       )}
     </div>
+
   );
 }

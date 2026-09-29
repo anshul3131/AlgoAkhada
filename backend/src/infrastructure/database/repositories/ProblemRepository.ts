@@ -57,6 +57,14 @@ export class ProblemRepository extends Repository<Problem> {
             .orderBy("RANDOM()")
             .getOne();
     }
+
+    async getRandomProblemByTopicAndDifficulty(topic: string, difficulty: string) {
+        return await this.createQueryBuilder("problem")
+            .where(":tag = ANY(problem.tags)", { tag: topic })
+            .andWhere("problem.difficulty = :difficulty", { difficulty })
+            .orderBy("RANDOM()")
+            .getOne();
+    }
 }
 
 export const problemRepository = new ProblemRepository();

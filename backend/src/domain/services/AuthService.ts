@@ -24,7 +24,8 @@ export class AuthService {
                 username: signUpRequest.username,
                 password: hashedPassword,
                 last_login_ip: signUpRequest.ipAddress || null,
-                last_login_device: signUpRequest.userAgent || null
+                last_login_device: signUpRequest.userAgent || null,
+                avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${signUpRequest.username}`
             });
             await userRepository.saveEntity(newUser);
 
@@ -35,7 +36,7 @@ export class AuthService {
             await userRepository.saveEntity(newUser);
 
             const data: AuthResponseDTO = {
-                user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating },
+                user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating, max_elo_rating: newUser.max_elo_rating, avatar_url: newUser.avatar_url },
                 accessToken,
                 refreshToken
             };
@@ -68,7 +69,7 @@ export class AuthService {
             await userRepository.saveEntity(user);
 
             const data: AuthResponseDTO = {
-                user: { id: user.id, email: user.email, username: user.username, elo_rating: user.elo_rating },
+                user: { id: user.id, email: user.email, username: user.username, elo_rating: user.elo_rating, max_elo_rating: user.max_elo_rating, avatar_url: user.avatar_url },
                 accessToken,
                 refreshToken
             };

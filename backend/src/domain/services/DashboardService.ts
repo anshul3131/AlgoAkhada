@@ -39,13 +39,14 @@ class DashboardService {
                     { user1: { id: userId }, status: MatchStatus.FINISHED },
                     { user2: { id: userId }, status: MatchStatus.FINISHED }
                 ],
-                relations: {winner : true},
+                relations: {winner : true, user1: true, user2: true, problem: true},
                 order: { created_at: "DESC" }
             });
 
             let wins = 0;
             let losses = 0;
             const matchHistoryRaw = [];
+            const recentMatches = [];
 
             for (const match of matches) {
                 const isWinner = match.winner && match.winner.id === userId;
@@ -56,6 +57,24 @@ class DashboardService {
                     date: match.created_at,
                     isWin: isWinner
                 });
+
+                if (recentMatches.length < 10) {
+                    const opponent = match.user1.id === userId ? match.user2 : match.user1;
+                    recentMatches.push({
+                        matchId: match.id,
+                        date: match.created_at,
+                        isWin: isWinner,
+                        opponent: {
+                            id: opponent.id,
+                            username: opponent.username,
+                            elo_rating: opponent.elo_rating
+                        },
+                        problem: {
+                            id: match.problem?.id,
+                            title: match.problem?.title
+                        }
+                    });
+                }
             }
 
             // Get current user Elo to trace backwards
@@ -105,7 +124,16 @@ class DashboardService {
                 submissionStats,
                 matchStats: { wins, losses },
                 topicsStats,
-                eloHistory
+                eloHistory,
+                recentMatches,
+                userProfile: user ? {
+                    id: user.id,
+                    username: user.username,
+                    elo_rating: user.elo_rating,
+                    max_elo_rating: user.max_elo_rating,
+                    avatar_url: user.avatar_url,
+                    created_at: user.created_at
+                } : null
             });
 
         } catch (error: any) {

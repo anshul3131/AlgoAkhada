@@ -135,7 +135,7 @@ export class MatchmakerService {
                 user1Id: user1.id,
                 user2Id: user2.id,
                 problemId: problem.id,
-                startTime: match.created_at
+                startTime: new Date().toISOString()
             }
         };
 

@@ -26,22 +26,22 @@ export function TopicsPieChart({ stats }: Props) {
 
   if (data.length === 0) {
     return (
-      <ChartWrapper title="Accepted By Topic">
+      <ChartWrapper title="Accepted By Topic" height={240}>
         <div className="text-text-secondary text-sm">No solved problems</div>
       </ChartWrapper>
     );
   }
 
   return (
-    <ChartWrapper title="Accepted By Topic">
-      <ResponsiveContainer width="100%" height={300}>
+    <ChartWrapper title="Accepted By Topic" height={240}>
+      <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
+            cy="45%"
+            innerRadius="50%"
+            outerRadius="95%"
             paddingAngle={2}
             dataKey="value"
             animationBegin={400}
@@ -52,6 +52,7 @@ export function TopicsPieChart({ stats }: Props) {
               <Cell key={`cell-${index}`} fill={COLORS[index]} className="hover:opacity-80 transition-opacity" />
             ))}
           </Pie>
+          <Legend verticalAlign="bottom" height={36} iconType="circle" />
           <Tooltip 
             contentStyle={{ backgroundColor: '#111318', borderColor: '#1f232b', borderRadius: '8px' }}
             itemStyle={{ color: '#e2e8f0' }}

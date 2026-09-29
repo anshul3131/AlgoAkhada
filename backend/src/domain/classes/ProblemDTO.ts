@@ -21,6 +21,7 @@ export class ProblemDetailDTO {
     tags: string[];
     samples?: ProblemSampleDTO[];
     lastSubmission?: LastSubmissionDTO;
+    pastSubmissions?: any[];
 }
 
 export class ProblemListItemDTO {

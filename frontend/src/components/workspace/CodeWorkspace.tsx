@@ -164,7 +164,7 @@ export function CodeWorkspace({
           <Button variant="ghost" onClick={runCode} disabled={isRunning || isSubmitting || isTimingOut}>
             {isRunning ? 'Running...' : 'Run Code'}
           </Button>
-          <Button variant="danger" onClick={() => onSubmit(language, code)} disabled={isSubmitting || isTimingOut}>
+          <Button variant="danger" onClick={() => { setRunResults(null); onSubmit(language, code); }} disabled={isSubmitting || isTimingOut}>
             {isTimingOut ? 'Resolving...' : isSubmitting ? 'Submitting...' : submitLabel}
           </Button>
         </div>

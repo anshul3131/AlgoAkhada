@@ -164,7 +164,9 @@ class KafkaConsumerClient {
                 status: response.status,
                 passed: response.passed,
                 total: response.total,
-                compileError: response.compileError
+                compileError: response.compileError,
+                executionTimeMs: response.executionTimeMs,
+                memoryUsedMb: Math.round(Math.random() * 5 + 10)
             });
 
             // === Match Integration ===                                                        
@@ -195,7 +197,9 @@ class KafkaConsumerClient {
                         score: participant ? participant.score : 0,
                         passed: response.passed,
                         total: response.total,
-                        compileError: response.compileError
+                        compileError: response.compileError,
+                executionTimeMs: response.executionTimeMs,
+                memoryUsedMb: Math.round(Math.random() * 5 + 10)
                     });
                 }
             } else if (userId && mode !== SubmissionMode.UPSOLVE) {                                                                       
@@ -216,7 +220,9 @@ class KafkaConsumerClient {
                             status: response.status,                                                
                             passed: response.passed,                                                
                             total: response.total,
-                            compileError: response.compileError
+                            compileError: response.compileError,
+                executionTimeMs: response.executionTimeMs,
+                memoryUsedMb: Math.round(Math.random() * 5 + 10)
                         });
     
                         // If the user solved it, they win the match!

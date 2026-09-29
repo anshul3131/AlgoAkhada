@@ -54,7 +54,7 @@ export function RecentSolutionScreen({
               Make another submission
             </Button>
           )}
-          <Button variant="ghost" onClick={onBack}>Back to lobby</Button>
+          <Button variant="ghost" onClick={onBack}>Back</Button>
         </div>
       </GlowPanel>
 
@@ -75,7 +75,7 @@ export function RecentSolutionScreen({
             </div>
             <div className="rounded-lg border border-border-hairline bg-bg-panel-raised p-4">
               <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary">Verdict</p>
-              <p className="mt-2 text-sm font-semibold text-accent-primary">{submission.status}</p>
+              <p className={`mt-2 text-sm font-semibold ${submission.status === 'Accepted' ? 'text-accent-primary' : 'text-accent-danger'}`}>{submission.status}</p>
             </div>
           </GlowPanel>
 

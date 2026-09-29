@@ -13,9 +13,12 @@ export function CustomLobbyRulesModal({
   onClose: () => void;
   onSubmit: (lobbyId: string) => void;
   isEditMode?: boolean;
-  initialData?: { lobbyId?: string, topic: string, timeLimitMins: number, maxParticipants: number };
+  initialData?: { lobbyId?: string, topic: string, timeLimitMins: number, maxParticipants: number, isPublic?: boolean };
 }) {
   const [topic, setTopic] = useState(initialData?.topic || 'dp');
+  const [name, setName] = useState('Custom Match');
+  const [difficulty, setDifficulty] = useState('Medium');
+  const [isPublic, setIsPublic] = useState(initialData?.isPublic || false);
   const [timeLimitMins, setTimeLimitMins] = useState(initialData?.timeLimitMins || 30);
   const [maxParticipants, setMaxParticipants] = useState(initialData?.maxParticipants || 10);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,6 +31,7 @@ export function CustomLobbyRulesModal({
       setTopic(initialData.topic);
       setTimeLimitMins(initialData.timeLimitMins);
       setMaxParticipants(initialData.maxParticipants);
+      setIsPublic(initialData.isPublic || false);
     }
   }, [isOpen, initialData]);
 
@@ -59,9 +63,9 @@ export function CustomLobbyRulesModal({
     setIsSubmitting(true);
     setError(null);
     if (isEditMode && initialData?.lobbyId) {
-      socket.emit('custom_lobby_update', { lobbyId: initialData.lobbyId, topic, timeLimit: timeLimitMins * 60, maxParticipants });
+      socket.emit('custom_lobby_update', { lobbyId: initialData.lobbyId, topic, timeLimit: timeLimitMins * 60, maxParticipants, isPublic });
     } else {
-      socket.emit('custom_lobby_create', { topic, timeLimit: timeLimitMins * 60, maxParticipants });
+      socket.emit('custom_lobby_create', { name, difficulty, isPublic, topic, timeLimit: timeLimitMins * 60, maxParticipants });
     }
   };
 
@@ -81,18 +85,46 @@ export function CustomLobbyRulesModal({
         <h2 className="mb-6 text-xl font-medium tracking-[0.1em] text-text-primary uppercase font-mono">
           {isEditMode ? 'Update Match Rules' : 'Create Custom Match'}
         </h2>
+
+        {!isEditMode && (
+          <div className="mb-4">
+            <label className="mb-2 block text-[10px] uppercase tracking-[0.2em] text-text-secondary">Lobby Name</label>
+            <input
+              type="text"
+              className="w-full rounded border border-border-hairline bg-bg-void px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Daily Practice, Friday Tournament..."
+            />
+          </div>
+        )}
         
-        <div className="mb-4">
-          <label className="mb-2 block text-[10px] uppercase tracking-[0.2em] text-text-secondary">Topic</label>
-          <select
-            className="w-full rounded border border-border-hairline bg-bg-void px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-          >
-            {problemTags.map(tag => (
-              <option key={tag} value={tag}>{tag.toUpperCase()}</option>
-            ))}
-          </select>
+        <div className="mb-4 grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-[10px] uppercase tracking-[0.2em] text-text-secondary">Topic</label>
+            <select
+              className="w-full rounded border border-border-hairline bg-bg-void px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+            >
+              {problemTags.map(tag => (
+                <option key={tag} value={tag}>{tag.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-[10px] uppercase tracking-[0.2em] text-text-secondary">Difficulty</label>
+            <select
+              className="w-full rounded border border-border-hairline bg-bg-void px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors"
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value)}
+              disabled={isEditMode}
+            >
+              <option value="Easy">EASY</option>
+              <option value="Medium">MEDIUM</option>
+              <option value="Hard">HARD</option>
+            </select>
+          </div>
         </div>
 
         <div className="mb-4">
@@ -119,6 +151,17 @@ export function CustomLobbyRulesModal({
             />
             <span className="font-mono text-xl text-accent-primary w-8 text-right">{maxParticipants}</span>
           </div>
+        </div>
+
+        <div className="mb-6 flex items-center justify-between rounded-lg border border-border-hairline bg-bg-void p-3">
+          <div>
+            <div className="text-sm font-medium text-text-primary">Public Lobby</div>
+            <div className="text-xs text-text-secondary">Show this lobby on the home screen</div>
+          </div>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input type="checkbox" className="peer sr-only" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+            <div className="peer h-6 w-11 rounded-full bg-border-hairline after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+          </label>
         </div>
 
         {error && <div className="mb-4 text-xs text-accent-danger tracking-wide">{error}</div>}

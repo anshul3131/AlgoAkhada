@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { Badge } from '../../components/shared/Badge';
@@ -81,6 +81,7 @@ export function CustomLobbyScreen({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isEditRulesModalOpen, setIsEditRulesModalOpen] = useState(false);
   const socket = useSocket();
+  const matchStartedRef = useRef(false);
   
   const { isMuted, isDeafened, toggleMute, toggleDeafen, remoteStreams, initiateConnection, isMediaReady, localStream } = useVoiceChat(lobbyId, currentUser.id);
 
@@ -100,7 +101,7 @@ export function CustomLobbyScreen({
       socket.emit('custom_lobby_join', { lobbyId });
     }
 
-    return () => { active = false; };
+    return () => { active = false; if (!matchStartedRef.current && socket) { socket.emit('custom_lobby_leave', { lobbyId }); } };
   }, [lobbyId, socket]);
 
   // Connect to peers as they join
@@ -120,6 +121,7 @@ export function CustomLobbyScreen({
 
   useRealtimeEvent('custom_match_started', (data) => {
     if (data.id === lobbyId && data.problemId) {
+      matchStartedRef.current = true;
       onMatchStart(data.problemId);
     }
   });
@@ -136,7 +138,7 @@ export function CustomLobbyScreen({
       <div className="flex h-screen items-center justify-center p-6 text-center">
         <div>
           <h2 className="mb-4 text-xl font-mono text-accent-danger uppercase tracking-widest">{error}</h2>
-          <Button onClick={onLeave}>Return to Dashboard</Button>
+          <Button onClick={onLeave}>Back</Button>
         </div>
       </div>
     );
@@ -157,7 +159,19 @@ export function CustomLobbyScreen({
     socket.emit('custom_lobby_start', { lobbyId });
   };
 
+  const handleTogglePublic = (newIsPublic: boolean) => {
+    if (!socket || !isHost) return;
+    socket.emit('custom_lobby_update', {
+      lobbyId: lobby.id,
+      topic: lobby.topic,
+      timeLimit: lobby.timeLimit,
+      maxParticipants: lobby.maxParticipants,
+      isPublic: newIsPublic
+    });
+  };
+
   const handleLeave = () => {
+    matchStartedRef.current = true;
     if (socket) {
       socket.emit('custom_lobby_leave', { lobbyId });
     }
@@ -167,12 +181,29 @@ export function CustomLobbyScreen({
   return (
     <div className="h-screen flex flex-col p-4 md:p-6 overflow-hidden max-w-[1600px] mx-auto">
       <div className="mb-4 flex flex-shrink-0 items-center justify-between bg-bg-panel-raised p-4 rounded-xl border border-border-hairline">
-        <h1 className="text-xl md:text-2xl font-mono uppercase tracking-[0.2em] text-text-primary flex items-center gap-4">
-          <span className="text-accent-primary drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]">●</span> CUSTOM ARENA
-        </h1>
-        <div className="flex items-center gap-4">
-          <Badge label={`JOIN CODE: ${lobby.joinCode}`} tone="primary" />
-          <Button variant="ghost" onClick={handleLeave} className="text-[10px] tracking-widest uppercase !px-3">Leave</Button>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl md:text-2xl font-mono uppercase tracking-[0.2em] text-text-primary flex items-center gap-4">
+            <span className="text-accent-primary drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]">●</span> {lobby.name || 'CUSTOM ARENA'}
+          </h1>
+          <span className="text-xs text-text-secondary uppercase tracking-[0.2em]">Topic: {lobby.topic} • Difficulty: {lobby.difficulty}</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">JOIN CODE</span>
+            <div 
+              className="relative font-mono text-2xl md:text-3xl font-black text-accent-electric tracking-[0.2em] cursor-pointer hover:text-white transition-colors group"
+              onClick={() => {
+                navigator.clipboard.writeText(lobby.joinCode);
+              }}
+              title="Click to copy"
+            >
+              {lobby.joinCode}
+              <svg className="absolute top-1/2 -translate-y-1/2 -right-7 w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <Button variant="ghost" onClick={handleLeave} className="text-[10px] tracking-widest uppercase !px-3 h-fit">Leave</Button>
         </div>
       </div>
 
@@ -181,9 +212,32 @@ export function CustomLobbyScreen({
         {/* LEFT COLUMN: Match Config & Host Controls */}
         <div className="md:col-span-1 flex flex-col gap-4 overflow-y-auto">
           <GlowPanel className="flex flex-col gap-4">
-            <div className="border-b border-border-hairline pb-4">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">Topic</p>
-              <p className="text-lg text-accent-primary font-medium">{lobby.topic}</p>
+            <div className="border-b border-border-hairline pb-4 flex flex-col gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">Topic</p>
+                <p className="text-sm text-accent-primary font-medium">{lobby.topic}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">Difficulty</p>
+                <p className={`text-sm font-medium ${lobby.difficulty === 'Hard' ? 'text-accent-danger' : lobby.difficulty === 'Medium' ? 'text-accent-warn' : 'text-accent-primary'}`}>{lobby.difficulty}</p>
+              </div>
+                            {isHost ? (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-[0.2em] font-medium ${lobby.isPublic ? 'text-accent-electric' : 'text-text-secondary'}`}>
+                      {lobby.isPublic ? 'Public' : 'Private'}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" className="peer sr-only" checked={lobby.isPublic} onChange={e => handleTogglePublic(e.target.checked)} />
+                    <div className="peer h-6 w-11 rounded-full bg-border-hairline after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                  </label>
+                </div>
+              ) : lobby.isPublic ? (
+                <div>
+                  <Badge label="Public Lobby" tone="electric" />
+                </div>
+              ) : null}
             </div>
             <div className="flex justify-between items-center">
               <p className="text-[10px] uppercase tracking-[0.2em] text-text-secondary">Rules</p>
@@ -304,7 +358,8 @@ export function CustomLobbyScreen({
           lobbyId: lobby.id,
           topic: lobby.topic,
           timeLimitMins: lobby.timeLimit / 60,
-          maxParticipants: lobby.maxParticipants
+          maxParticipants: lobby.maxParticipants,
+          isPublic: lobby.isPublic
         }}
       />
     </div>

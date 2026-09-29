@@ -10,7 +10,7 @@ import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/Resp
 
 export class CustomMatchService {
 
-    public async createLobby(hostId: string, topic: string, timeLimit: number, maxParticipants: number): Promise<ResponseData> {
+    public async createLobby(hostId: string, topic: string, timeLimit: number, maxParticipants: number, name: string = "Custom Match", difficulty: string = "Medium", isPublic: boolean = false): Promise<ResponseData> {
         try {
             const host = await userRepository.getUserById(hostId);
             if (!host) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.HOST_NOT_FOUND);
@@ -22,6 +22,9 @@ export class CustomMatchService {
                 timeLimit,
                 maxParticipants,
                 joinCode,
+                name,
+                difficulty,
+                isPublic,
                 status: MatchStatus.NOT_STARTED
             });
 
@@ -43,7 +46,7 @@ export class CustomMatchService {
         }
     }
 
-    public async updateLobby(matchId: string, userId: string, data: { topic?: string, timeLimit?: number, maxParticipants?: number }): Promise<ResponseData> {
+    public async updateLobby(matchId: string, userId: string, data: { topic?: string, timeLimit?: number, maxParticipants?: number, isPublic?: boolean }): Promise<ResponseData> {
         try {
             const match = await customMatchRepository.getMatchById(matchId);
             if (!match) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
@@ -53,6 +56,7 @@ export class CustomMatchService {
             if (data.topic) match.topic = data.topic;
             if (data.timeLimit) match.timeLimit = data.timeLimit;
             if (data.maxParticipants) match.maxParticipants = data.maxParticipants;
+            if (data.isPublic !== undefined) match.isPublic = data.isPublic;
 
             await customMatchRepository.saveEntity(match);
 
@@ -121,7 +125,7 @@ export class CustomMatchService {
                 match.host = match.participants[0]!.user;
                 await customMatchRepository.saveEntity(match);
             } else if (match.participants?.length === 0) {
-                // If lobby empty, maybe we could delete the match, but for now just leave it
+                match.status = MatchStatus.ABORTED;
                 await customMatchRepository.saveEntity(match);
             }
 
@@ -158,7 +162,7 @@ export class CustomMatchService {
             if (match.host?.id !== hostId) return ResponseData.build(RESPONSE_CODES.UNAUTHORIZED, RESPONSE_MESSAGES.ONLY_HOST_CAN_START);
             if (match.status !== MatchStatus.NOT_STARTED) return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.MATCH_ALREADY_STARTED);
 
-            const randomProblem = await problemRepository.getRandomProblemByTopic(match.topic);
+            const randomProblem = await problemRepository.getRandomProblemByTopicAndDifficulty(match.topic, match.difficulty || 'Medium');
 
             if (!randomProblem) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NO_PROBLEMS_FOUND_FOR_TOPIC);
 
@@ -171,6 +175,28 @@ export class CustomMatchService {
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
             console.error('[CustomMatchService] startMatch error:', error.message);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    public async getPublicLobbies(): Promise<ResponseData> {
+        try {
+            const matches = await customMatchRepository.getPublicLobbies();
+            const payloads = matches.map(match => ({
+                id: match.id,
+                hostId: match.host?.id,
+                hostUsername: match.host?.username,
+                timeLimit: match.timeLimit,
+                maxParticipants: match.maxParticipants,
+                joinCode: match.joinCode,
+                topic: match.topic,
+                name: match.name,
+                difficulty: match.difficulty,
+                participantCount: match.participants?.length || 0
+            }));
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payloads);
+        } catch (error: any) {
+            console.error('[CustomMatchService] getPublicLobbies error:', error.message);
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
@@ -188,6 +214,9 @@ export class CustomMatchService {
             joinCode: match.joinCode,
             startedAt: match.startedAt?.toISOString(),
             topic: match.topic,
+            name: match.name,
+            difficulty: match.difficulty,
+            isPublic: match.isPublic,
             status: match.status,
             participants: (match.participants || []).map(p => ({
                 userId: p.user.id,

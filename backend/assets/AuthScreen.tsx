@@ -62,33 +62,18 @@ export function AuthScreen({ onAuthenticated, login, signup, isLoading, error }:
             draggable={false}
           />
         </div>
-        <div className="mt-8 flex flex-col items-center text-center">
-          <p className="max-w-md font-mono text-xl font-light italic tracking-tight text-text-primary/90 md:text-2xl lg:mt-10 lg:text-3xl">
-            "Where algorithms meet <span className="font-bold text-accent-electric not-italic drop-shadow-[0_0_12px_rgba(0,195,255,0.6)]">combat</span>."
-          </p>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary/80 lg:mt-6">
-            Enter the arena &bull; Outsmart opponents &bull; Claim your rank
-          </p>
-        </div>
-        <ul className="mt-10 hidden flex-nowrap justify-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-text-primary lg:flex max-w-[40rem] mx-auto">
-          <li className="flex items-center whitespace-nowrap gap-2.5 rounded-xl border border-accent-electric/40 bg-accent-electric/10 px-4 py-3 backdrop-blur-md transition-all hover:-translate-y-1 hover:bg-accent-electric/20 hover:shadow-[0_4px_20px_rgba(0,195,255,0.25)] cursor-default">
-            <svg className="h-4 w-4 text-accent-electric" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z" clipRule="evenodd" />
-            </svg>
-            Live 1v1 Battles
-          </li>
-          <li className="flex items-center whitespace-nowrap gap-2.5 rounded-xl border border-accent-primary/40 bg-accent-primary/10 px-4 py-3 backdrop-blur-md transition-all hover:-translate-y-1 hover:bg-accent-primary/20 hover:shadow-[0_4px_20px_rgba(0,255,136,0.25)] cursor-default">
-            <svg className="h-4 w-4 text-accent-primary" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Global Elo System
-          </li>
-          <li className="flex items-center whitespace-nowrap gap-2.5 rounded-xl border border-accent-warn/40 bg-accent-warn/10 px-4 py-3 backdrop-blur-md transition-all hover:-translate-y-1 hover:bg-accent-warn/20 hover:shadow-[0_4px_20px_rgba(255,190,0,0.25)] cursor-default">
-            <svg className="h-4 w-4 text-accent-warn" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Custom Lobbies
-          </li>
+        <p className="mt-6 max-w-md text-lg text-text-secondary lg:mt-10 lg:text-xl">
+          Solve problems, enter live matches, and climb the ranks against coders worldwide.
+        </p>
+        <ul className="mt-8 hidden gap-3 text-sm text-text-secondary lg:flex">
+          {['Ranked 1v1 duels', 'Live leaderboards', 'Hundreds of problems'].map((item) => (
+            <li
+              key={item}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur"
+            >
+              {item}
+            </li>
+          ))}
         </ul>
       </section>
 

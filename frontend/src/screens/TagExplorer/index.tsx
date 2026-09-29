@@ -5,6 +5,16 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import { problemApi } from '../../lib/api';
 import type { ProblemListItem } from '../../types';
 
+const ChevronStack = ({ up }: { up?: boolean }) => (
+  <div className="flex flex-col items-center justify-center -space-y-[3px]">
+    {[0, 1, 2].map(i => (
+      <svg key={i} width="14" height="6" viewBox="0 0 24 10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <path d={up ? "M2 8l10-6 10 6" : "M2 2l10 6 10-6"} />
+      </svg>
+    ))}
+  </div>
+);
+
 export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, initialTag }: {
   onBackToLobby: () => void;
   onSolveProblem: (problemId: string) => void;
@@ -17,6 +27,7 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
   const [loadingTags, setLoadingTags] = useState(true);
   const [loadingProblems, setLoadingProblems] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -85,30 +96,39 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => onFindMatch(selectedTag)}>Find Match</Button>
-          <Button variant="ghost" onClick={onBackToLobby}>Back to Lobby</Button>
+          <Button variant="ghost" onClick={onBackToLobby}>Back</Button>
         </div>
       </div>
 
-      <GlowPanel className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          {loadingTags ? (
-            <span className="text-sm text-text-secondary">Loading topics...</span>
-          ) : (
-            tags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(tag)}
-                className={`rounded-full border px-3 py-2 text-[10px] uppercase tracking-[0.2em] transition-all ${
-                  selectedTag === tag
-                    ? 'border-accent-primary bg-accent-primary/15 text-accent-primary shadow-[0_0_0_1px_rgba(76,255,190,0.2)]'
-                    : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-accent-primary hover:text-accent-primary'
-                }`}
-              >
-                {tag}
-              </button>
-            ))
-          )}
+      <GlowPanel className="mb-6 relative p-4 pr-16">
+        <div className={`${topicsExpanded ? 'max-h-[200px] overflow-y-auto' : 'max-h-[34px] overflow-hidden'} transition-all duration-300 ease-in-out`}>
+          <div className="flex flex-wrap gap-2">
+            {loadingTags ? (
+              <span className="text-sm text-text-secondary">Loading topics...</span>
+            ) : (
+              tags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className={`rounded-full border px-3 py-2 text-[10px] uppercase tracking-[0.2em] transition-all ${
+                    selectedTag === tag
+                      ? 'border-accent-primary bg-accent-primary/15 text-accent-primary shadow-[0_0_0_1px_rgba(76,255,190,0.2)]'
+                      : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-accent-primary hover:text-accent-primary'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))
+            )}
+          </div>
         </div>
+        <button 
+          onClick={() => setTopicsExpanded(!topicsExpanded)}
+          className="absolute right-4 top-4 font-mono text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-text-primary transition-colors rounded-full px-3 py-2 border border-border-hairline bg-bg-void shadow-lg z-10 flex items-center gap-2"
+        >
+          <ChevronStack up={topicsExpanded} />
+          {topicsExpanded ? 'Collapse' : 'Expand'}
+        </button>
       </GlowPanel>
 
       {error && (
@@ -122,16 +142,20 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
           <GlowPanel className="p-6 text-text-secondary">No problems are available for this tag yet.</GlowPanel>
         ) : (
           problems.map((problem) => (
-            <GlowPanel key={problem.id} className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <button 
+              key={problem.id} 
+              onClick={() => onSolveProblem(problem.id)}
+              className="flex w-full flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur text-left transition-all hover:border-accent-primary/50 hover:bg-accent-primary/5 group"
+            >
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold text-text-primary">{problem.title}</h2>
+                  <h2 className="text-xl font-semibold text-text-primary group-hover:text-accent-primary transition-colors">{problem.title}</h2>
                   <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'primary' : problem.difficulty === 'Hard' ? 'danger' : 'electric'} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   {problem.tags?.map((tag) => (
-                    <span key={`${problem.id}-${tag}`} className="rounded-full border border-border-hairline bg-bg-panel-raised px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-text-secondary">
+                    <span key={`${problem.id}-${tag}`} className="rounded-full border border-border-hairline bg-bg-panel-raised px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-text-secondary group-hover:border-accent-primary/30 transition-colors">
                       {tag}
                     </span>
                   ))}
@@ -139,12 +163,11 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <div className="mr-2 hidden rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 text-xs uppercase tracking-[0.18em] text-text-secondary md:block">
+                <div className="mr-2 hidden rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 text-xs uppercase tracking-[0.18em] text-text-secondary md:block group-hover:border-accent-primary/30 group-hover:text-text-primary transition-colors">
                   {problem.timeLimit ?? 2}s / {(problem.memoryLimit ?? 256)}MB
                 </div>
-                <Button variant="primary" onClick={() => onSolveProblem(problem.id)}>Solve</Button>
               </div>
-            </GlowPanel>
+            </button>
           ))
         )}
 

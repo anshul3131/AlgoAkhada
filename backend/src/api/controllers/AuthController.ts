@@ -113,6 +113,7 @@ export class AuthController {
             email: user.email,
             username: user.username,
             elo_rating: (user as any).elo_rating,
+            avatar_url: user.avatar_url,
             created_at: user.created_at,
         };
 

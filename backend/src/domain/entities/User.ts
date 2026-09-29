@@ -26,6 +26,12 @@ export class User {
     @Column({ type: "varchar", nullable: true })
     last_login_device: string | null;
 
+    @Column({ type: "varchar", nullable: true })
+    avatar_url: string | null;
+
+    @Column({ type: "int", default: 1200 })
+    max_elo_rating: number;
+
     @CreateDateColumn()
     created_at: Date;
 }

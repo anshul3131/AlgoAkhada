@@ -78,7 +78,7 @@ export function AftermathScreen({ result, elo, matchId, onRematch, onMatchFound,
               {rematchState === 'declined' && 'Opponent Left'}
             </Button>
           )}
-          <Button variant="ghost" onClick={handleLobby}>Return to Lobby</Button>
+          <Button variant="ghost" onClick={handleLobby}>Home</Button>
         </div>
       </GlowPanel>
     </main>

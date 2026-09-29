@@ -18,22 +18,22 @@ export function MatchesPieChart({ stats }: Props) {
 
   if (data.length === 0) {
     return (
-      <ChartWrapper title="Total 2-Player Matches">
+      <ChartWrapper title="Total 2-Player Matches" height={200}>
         <div className="text-text-secondary text-sm">No matches played</div>
       </ChartWrapper>
     );
   }
 
   return (
-    <ChartWrapper title="Total 2-Player Matches">
-      <ResponsiveContainer width="100%" height={300}>
+    <ChartWrapper title="Total 2-Player Matches" height={200}>
+      <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
+            cy="45%"
             innerRadius={0}
-            outerRadius={100}
+            outerRadius="95%"
             paddingAngle={2}
             dataKey="value"
             animationBegin={200}

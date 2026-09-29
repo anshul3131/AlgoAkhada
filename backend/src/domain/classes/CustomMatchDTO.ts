@@ -13,6 +13,9 @@ export class CustomMatchDTO {
     maxParticipants: number;
     joinCode: string;
     startedAt?: string;
+    name: string;
+    difficulty: string;
+    isPublic: boolean;
     topic: string;
     status: string;
     participants: CustomParticipantDTO[];

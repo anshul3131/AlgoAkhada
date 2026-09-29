@@ -7,6 +7,8 @@ export interface AuthUser {
   email: string;
   username: string;
   elo_rating: number;
+  max_elo_rating?: number;
+  avatar_url?: string | null;
   created_at: string;
 }
 
@@ -46,6 +48,7 @@ export interface ProblemRecord {
   timeLimit?: number;
   memoryLimit?: number;
   samples?: { id: string; input: string; output: string; explanation?: string; }[];
+  pastSubmissions?: { id: string; status: string; language: string; submittedAt: string; executionTimeMs: number; }[];
   lastSubmission?: {
     code: string;
     language: string;
@@ -141,6 +144,15 @@ export const userApi = {
 export const problemApi = {
   getTags: () => request<{ tags: string[] }>('/problems/tags'),
 
+  getProblems: (params?: { page?: number; limit?: number; difficulty?: string; search?: string; tag?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.limit) query.append("limit", String(params.limit));
+    if (params?.difficulty) query.append("difficulty", params.difficulty);
+    if (params?.search) query.append("search", params.search);
+    if (params?.tag) query.append("tag", params.tag);
+    return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`);
+  },
   getProblemsByTag: (tag: string, page = 1, limit = 20) => {
     const query = new URLSearchParams({ tag, page: String(page), limit: String(limit) });
     return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`);
@@ -214,6 +226,7 @@ export const executionApi = {
 };
 
 export const customMatchApi = {
+  getPublicLobbies: () => request<any[]>(`/custom-matches/public`),
   getMatch: (id: string) => request<any>(`/custom-matches/${id}`),
 };
 
@@ -232,6 +245,28 @@ export interface DashboardStats {
   };
   topicsStats: Record<string, number>;
   eloHistory: Array<{ date: string; elo: number }>;
+  recentMatches?: Array<{
+    matchId: string;
+    date: string;
+    isWin: boolean;
+    opponent: {
+      id: string;
+      username: string;
+      elo_rating: number;
+    };
+    problem: {
+      id: string;
+      title: string;
+    };
+  }>;
+  userProfile?: {
+    id: string;
+    username: string;
+    elo_rating: number;
+    max_elo_rating: number;
+    avatar_url: string | null;
+    created_at: string;
+  };
 }
 
 export const dashboardApi = {

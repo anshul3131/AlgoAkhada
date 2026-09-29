@@ -150,7 +150,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
               onClick={handleExitMatch}
               className="rounded bg-accent-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-primary transition-colors hover:bg-accent-primary hover:text-white"
             >
-              Exit to Lobby
+              Home
             </button>
           ) : (
             <button 
@@ -210,7 +210,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
             {submissionModal.status === 'Accepted' ? (
               <div className="flex flex-col gap-4">
                 <Button variant="primary" onClick={() => setSubmissionModal(null)}>Continue Match</Button>
-                <Button variant="ghost" onClick={handleExitMatch}>Exit to Lobby</Button>
+                <Button variant="ghost" onClick={handleExitMatch}>Home</Button>
               </div>
             ) : (
               <div className="flex justify-center">
@@ -285,7 +285,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
             </div>
             
             <div className="flex justify-center">
-              <Button className="px-8 py-3 text-sm" onClick={onLobby}>Return to Dashboard</Button>
+              <Button className="px-8 py-3 text-sm" onClick={onLobby}>Back</Button>
             </div>
           </GlowPanel>
         </div>

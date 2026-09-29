@@ -7,6 +7,14 @@ import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/cl
 export class CustomMatchController {
 
     @Authorized()
+    @Get('/public')
+    public async getPublicLobbies(@Res() res: Response) {
+        const response = await customMatchService.getPublicLobbies();
+        res.status(response.responseCode).send({ success: response.responseCode < 400, data: response.data });
+        return res;
+    }
+
+    @Authorized()
     @Get('/:id')
     public async getMatch(@Param("id") id: string, @Res() res: Response) {
         const dto = await customMatchService.getLobbyDTO(id);

@@ -19,6 +19,7 @@ export interface ExecutionResult {
     passed: number;
     total: number;
     failedTestCase?: TestCase;
+    executionTimeMs?: number;
     testCaseResults?: TestCaseExecutionResult[];
     compileError?: string;
 }
@@ -104,10 +105,16 @@ export abstract class CodeExecutor {
 
                 // If not in run mode, halt early on failure to save resources
                 if (!isRunMode && !tcPassed) {
-                    return { status: tcStatus, passed: passedCount, total: testCases.length, failedTestCase: tc };
+                    return { status: tcStatus, passed: passedCount, total: testCases.length, failedTestCase: tc, executionTimeMs: totalExecutionTimeMs };
                 }
             }
-            return { status: SubmissionStatus.ACCEPTED, passed: passedCount, total: testCases.length, testCaseResults: isRunMode ? testCaseResults : undefined } as ExecutionResult;
+            let finalStatus = SubmissionStatus.ACCEPTED;
+            if (isRunMode && passedCount < testCases.length) {
+                const firstFailed = testCaseResults.find(r => r.status !== SubmissionStatus.SUCCESS && r.status !== 'Accepted');
+                finalStatus = firstFailed ? firstFailed.status as SubmissionStatus : SubmissionStatus.WRONG_ANSWER;
+            }
+            
+            return { status: finalStatus, passed: passedCount, total: testCases.length, testCaseResults: isRunMode ? testCaseResults : undefined, executionTimeMs: totalExecutionTimeMs } as ExecutionResult;
 
         } finally {
             // 4. Cleanup

@@ -9,9 +9,9 @@ import { problemApi, submissionApi, executionApi, type ProblemRecord, type Langu
 import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
 import { SplitLayout } from '../../components/shared/SplitLayout';
 
-interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; }
+interface BattlegroundProps { userId: string; matchId: string; problemId: string; onFinished: (winnerId: string) => void; startTime?: string; }
 
-export function Battleground({ userId, matchId, problemId, onFinished }: BattlegroundProps) {
+export function Battleground({ userId, matchId, problemId, onFinished, startTime }: BattlegroundProps) {
   const { joinMatch, leaveMatch, updateMatchCode, subscribeToSubmission, finishMatchOnTimeout, forfeitMatch } = useRealtimeContext();
   const [problem, setProblem] = useState<ProblemRecord | null>(null);
   const [languages, setLanguages] = useState<LanguageRecord[]>([]);
@@ -64,7 +64,18 @@ export function Battleground({ userId, matchId, problemId, onFinished }: Battleg
     finishMatchOnTimeout(matchId);
   }, [finishMatchOnTimeout, matchId]);
 
-  const { remaining, pressureLevel } = useCountdownTimer(420, handleTimeout);
+  const [timerSeconds, setTimerSeconds] = useState(1800);
+
+  useEffect(() => {
+    if (startTime) {
+      const elapsed = (Date.now() - new Date(startTime).getTime()) / 1000;
+      setTimerSeconds(Math.max(1, 1800 - Math.floor(elapsed)));
+    } else {
+      setTimerSeconds(1800);
+    }
+  }, [startTime]);
+
+  const { remaining, pressureLevel } = useCountdownTimer(timerSeconds, handleTimeout);
 
   const submit = async (language: string, code: string) => {
     setIsSubmitting(true);

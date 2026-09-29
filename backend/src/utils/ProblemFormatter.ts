@@ -23,12 +23,22 @@ export class ProblemFormatter {
         formatted = formatted.replace(/-----Note-----/gi, `\n\n<h3 class="${headerClass}">Note</h3>\n\n`);
 
         // 3. Render common LaTeX symbols (Order matters! Replace longer macros first)
+        // Extract text inside \text{} and \operatorname{}
+        formatted = formatted.replace(/\\operatorname\{([^}]+)\}/g, '$1');
+        formatted = formatted.replace(/\\text\{([^}]+)\}/g, '$1');
+        formatted = formatted.replace(/\\textbf\{([^}]+)\}/g, '<b>$1</b>');
+        formatted = formatted.replace(/\\textit\{([^}]+)\}/g, '<i>$1</i>');
+        
+        // Escape curly braces that are escaped in latex
+        formatted = formatted.replace(/\\\{/g, '{');
+        formatted = formatted.replace(/\\\}/g, '}');
+
         formatted = formatted.replace(/\\leq/g, '≤');
         formatted = formatted.replace(/\\geq/g, '≥');
         formatted = formatted.replace(/\\le/g, '≤');
         formatted = formatted.replace(/\\ge/g, '≥');
-        formatted = formatted.replace(/\\ne/g, '≠');
         formatted = formatted.replace(/\\neq/g, '≠');
+        formatted = formatted.replace(/\\ne\b/g, '≠');
         formatted = formatted.replace(/\\cdot/g, '·');
         formatted = formatted.replace(/\\times/g, '×');
         formatted = formatted.replace(/\\dots/g, '...');
@@ -36,6 +46,13 @@ export class ProblemFormatter {
         formatted = formatted.replace(/\\infty/g, '∞');
         formatted = formatted.replace(/\\equiv/g, '≡');
         formatted = formatted.replace(/\\approx/g, '≈');
+        formatted = formatted.replace(/\\in\b/g, '∈');
+        formatted = formatted.replace(/\\notin\b/g, '∉');
+        formatted = formatted.replace(/\\subset\b/g, '⊂');
+        formatted = formatted.replace(/\\supset\b/g, '⊃');
+        formatted = formatted.replace(/\\cup\b/g, '∪');
+        formatted = formatted.replace(/\\cap\b/g, '∩');
+        formatted = formatted.replace(/\\emptyset\b/g, '∅');
         formatted = formatted.replace(/\\quad/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
         formatted = formatted.replace(/\\textrm\{mod\}\\;/g, 'mod ');
         formatted = formatted.replace(/\\pmod/g, 'mod');

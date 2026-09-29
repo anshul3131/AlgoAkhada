@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { useState, useEffect } from 'react';
 import { AftermathScreen } from './screens/Aftermath';
 import { AuthScreen } from './screens/Auth';
@@ -7,19 +8,89 @@ import { MatchmakingQueue } from './screens/Queue';
 import { PracticeScreen } from './screens/Practice';
 import { RecentSolutionScreen } from './screens/RecentSolution';
 import { TagExplorerScreen } from './screens/TagExplorer';
+import { ProblemsScreen } from './screens/Problems';
 import { useAuth } from './hooks/useAuth';
 import { RealtimeProvider, useRealtimeEvent, useSocket } from './providers/RealtimeProvider';
 import { CustomLobbyScreen } from './screens/CustomLobby';
+import { TopNav } from "./components/shared/TopNav";
+
 import { DashboardScreen } from './screens/Dashboard';
 import { CustomBattleground } from './screens/CustomBattleground';
 import { SpectatorScreen } from './screens/Spectator';
 import type { AuthUser } from './lib/api';
 
-type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby' | 'dashboard' | 'spectator';
-type MatchContext = { matchId: string; problemId: string; players?: { id: string, username: string }[] };
+type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby' | 'dashboard' | 'spectator' | 'problems';
+type MatchContext = { matchId: string; problemId: string; players?: { id: string, username: string }[]; startTime?: string; };
 
 function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
-  const [screen, setScreen] = useState<Screen>(() => (sessionStorage.getItem('screen') as Screen) || 'lobby');
+  const [screenHistory, setScreenHistory] = useState<Screen[]>(() => {
+    const hist = sessionStorage.getItem('screenHistory');
+    if (hist) return JSON.parse(hist);
+    const curr = sessionStorage.getItem('screen') as Screen;
+    return [curr || 'lobby'];
+  });
+  const screen = screenHistory[screenHistory.length - 1] || 'lobby';
+  
+  // Sync initial load with URL hash if present
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '') as Screen;
+    if (hash && hash !== screen) {
+      setScreenHistory(prev => {
+        const newHist = hash === 'lobby' ? ['lobby' as Screen] : [...prev, hash];
+        sessionStorage.setItem('screenHistory', JSON.stringify(newHist));
+        sessionStorage.setItem('screen', hash);
+        return newHist;
+      });
+    } else if (!window.location.hash) {
+      window.history.replaceState({ screen }, '', `#${screen}`);
+    }
+  }, []);
+
+  // Listen for native browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const hash = window.location.hash.replace('#', '') as Screen;
+      const targetScreen = hash || 'lobby';
+
+      setScreenHistory(prev => {
+        // If we are going backward in our stack
+        if (prev.length > 1 && prev[prev.length - 2] === targetScreen) {
+          const newHist = prev.slice(0, -1);
+          sessionStorage.setItem('screenHistory', JSON.stringify(newHist));
+          sessionStorage.setItem('screen', newHist[newHist.length - 1]);
+          return newHist;
+        } else {
+          // If going forward or jumping, just push to stack
+          const newHist = targetScreen === 'lobby' ? ['lobby' as Screen] : [...prev, targetScreen];
+          sessionStorage.setItem('screenHistory', JSON.stringify(newHist));
+          sessionStorage.setItem('screen', targetScreen);
+          return newHist;
+        }
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const setScreen = (newScreen: Screen) => {
+    setScreenHistory(prev => {
+      const newHist = newScreen === 'lobby' ? ['lobby' as Screen] : [...prev, newScreen];
+      sessionStorage.setItem('screenHistory', JSON.stringify(newHist));
+      sessionStorage.setItem('screen', newScreen);
+      window.history.pushState({ screen: newScreen }, '', `#${newScreen}`);
+      return newHist;
+    });
+  };
+
+  const goBack = () => {
+    if (screenHistory.length > 1) {
+      // Triggers popstate listener which handles the actual state update
+      window.history.back();
+    } else {
+      setScreen('lobby');
+    }
+  };
   const [match, setMatch] = useState<MatchContext | null>(() => {
     const m = sessionStorage.getItem('match');
     return m ? JSON.parse(m) : null;
@@ -38,7 +109,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
   const socket = useSocket();
 
   useEffect(() => {
-    sessionStorage.setItem('screen', screen);
+    
     if (match) sessionStorage.setItem('match', JSON.stringify(match));
     else sessionStorage.removeItem('match');
     
@@ -119,11 +190,23 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
   };
 
   return (
-    <main className="min-h-screen bg-bg-void text-text-primary">
-      {screen === 'lobby' && (
+    <main className="min-h-screen bg-bg-void text-text-primary flex flex-col">
+      {!['battle', 'custom-battle', 'practice', 'spectator'].includes(screen) && (
+        <TopNav 
+          username={user.username} 
+          avatarUrl={user.avatar_url} 
+          onDashboard={() => setScreen('dashboard')}
+          onProblems={() => setScreen('problems')} 
+          onHome={() => setScreen('lobby')}
+          onLogout={logout} 
+        />
+      )}
+      <div className="flex-1 flex flex-col">
+        {screen === 'lobby' && (
         <LobbyDashboard
           username={user.username}
           elo={elo}
+          avatarUrl={user.avatar_url}
           onFindMatch={enterQueue}
           onExploreTags={(tag) => {
             setTagExplorerInitialTag(tag);
@@ -149,16 +232,26 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           externalError={errorMsg}
         />
       )}
-      {screen === 'queue' && <MatchmakingQueue tag={queueTag} onCancel={() => setScreen('lobby')} onMatchFound={onMatchFound} />}
-      {screen === 'battle' && match && <Battleground userId={user.id} matchId={match.matchId} problemId={match.problemId} onFinished={onFinished} />}
+      {screen === 'queue' && <MatchmakingQueue tag={queueTag} onCancel={goBack} onMatchFound={onMatchFound} />}
+      {screen === 'battle' && match && <Battleground userId={user.id} matchId={match.matchId} problemId={match.problemId} onFinished={onFinished} startTime={match.startTime} />}
       {screen === 'custom-battle' && match && <CustomBattleground userId={user.id} lobbyId={match.matchId} problemId={match.problemId} onFinished={onCustomFinished} onLobby={() => setScreen('lobby')} />}
-      {screen === 'aftermath' && <AftermathScreen result={result} elo={elo} matchId={match?.matchId} onRematch={enterQueue} onMatchFound={onMatchFound} onLobby={() => setScreen('lobby')} />}
-      {screen === 'spectator' && match && <SpectatorScreen matchId={match.matchId} problemId={match.problemId} players={match.players} onBack={() => setScreen('lobby')} />}
-      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={() => setScreen('lobby')} onUpsolve={onUpsolve} />}
+      {screen === 'aftermath' && <AftermathScreen result={result} elo={elo}
+          matchId={match?.matchId} onRematch={enterQueue} onMatchFound={onMatchFound} onLobby={() => setScreen('lobby')} />}
+      {screen === 'spectator' && match && <SpectatorScreen matchId={match.matchId} problemId={match.problemId} players={match.players} onBack={goBack} />}
+      {screen === 'solution-review' && reviewSubmissionId && <RecentSolutionScreen submissionId={reviewSubmissionId} onBack={goBack} onUpsolve={onUpsolve} />}
+
+      {screen === 'problems' && (
+        <ProblemsScreen
+          onSolveProblem={(problemId) => {
+            setPracticeProblemId(problemId);
+            setScreen('upsolve');
+          }}
+        />
+      )}
       {screen === 'tag-explorer' && (
         <TagExplorerScreen
           initialTag={tagExplorerInitialTag}
-          onBackToLobby={() => setScreen('lobby')}
+          onBackToLobby={goBack}
           onSolveProblem={(problemId) => {
             setPracticeProblemId(problemId);
             setScreen('upsolve');
@@ -171,7 +264,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           userId={user.id}
           problemId={practiceProblemId}
           mode="upsolve"
-          onBack={() => setScreen('tag-explorer')}
+          onBack={goBack} onReviewSubmission={onReviewSolution}
         />
       )}
       {screen === 'custom-lobby' && customLobbyId && (
@@ -180,7 +273,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           currentUser={user}
           onLeave={() => {
             setCustomLobbyId(null);
-            setScreen('lobby');
+            goBack();
           }}
           onMatchStart={(problemId) => {
             setMatch({ matchId: customLobbyId, problemId });
@@ -188,7 +281,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           }}
         />
       )}
-      {screen === 'dashboard' && <DashboardScreen onBack={() => setScreen('lobby')} username={user.username} />}
+      {screen === 'dashboard' && <DashboardScreen onBack={goBack} username={user.username} onUpsolve={onUpsolve} />}
 
       {/* Invite Modal */}
       {inviteModal && (
@@ -215,6 +308,7 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }
@@ -226,5 +320,5 @@ export default function App() {
     return <AuthScreen onAuthenticated={() => undefined} login={auth.login} signup={auth.signup} isLoading={auth.isLoading} error={auth.error} />;
   }
 
-  return <RealtimeProvider><ArenaShell user={auth.user} logout={auth.logout} /></RealtimeProvider>;
+  return <ErrorBoundary><RealtimeProvider><ArenaShell user={auth.user} logout={auth.logout} /></RealtimeProvider></ErrorBoundary>;
 }

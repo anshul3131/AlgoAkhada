@@ -39,6 +39,17 @@ export class CustomMatchRepository extends Repository<CustomMatch> {
             },
         });
     }
+
+    async getPublicLobbies() {
+        return await this.find({
+            where: { isPublic: true, status: "NOT_STARTED" as any },
+            relations: {
+                host: true,
+                participants: { user: true }
+            },
+            order: { created_at: "DESC" }
+        });
+    }
 }
 
 export const customMatchRepository = new CustomMatchRepository();
