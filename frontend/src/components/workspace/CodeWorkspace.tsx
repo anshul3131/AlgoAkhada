@@ -1,7 +1,8 @@
 import { Sun, Moon } from "lucide-react";
 
 import { useState, useRef, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { type Monaco } from '@monaco-editor/react';
+import { useTheme } from '../../hooks/useTheme';
 import js_beautify from 'js-beautify';
 import { Badge } from '../shared/Badge';
 import { Button } from '../shared/Button';
@@ -46,7 +47,7 @@ export function CodeWorkspace({
   languages,
   isSubmitting,
   isTimingOut = false,
-  submitLabel = 'Submit Solution',
+  submitLabel = 'Submit',
   onSubmit,
   onCodeChange,
   verdict,
@@ -62,10 +63,9 @@ export function CodeWorkspace({
   initialLanguage
 }: CodeWorkspaceProps) {
   const [language, setLanguage] = useState('C++');
-  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
   const [codeMap, setCodeMap] = useState<Record<string, string>>(boilerplates);
   const code = codeMap[language] ?? boilerplates[language] ?? '';
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setCode = (val: string) => { 
     setCodeMap(prev => ({ ...prev, [language]: val })); 
     
@@ -88,18 +88,35 @@ export function CodeWorkspace({
   const [runResults, setRunResults] = useState<ExecutionResponse | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
-    editorRef.current = editor;
-    monaco.editor.defineTheme('hackerDark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [],
+  const { isDark } = useTheme();
+
+  const defineThemes = (monaco: Monaco) => {
+    monaco.editor.defineTheme('algo-dark', {
+      base: 'vs-dark', inherit: true, rules: [],
       colors: {
-        'editor.background': '#0A0A0F', 
-        'editor.lineHighlightBackground': '#13131A',
-      }
+        'editor.background': '#13131A',
+        'editorGutter.background': '#13131A',
+        'editor.lineHighlightBackground': '#1B1B25',
+        'editorLineNumber.foreground': '#4A4A5C',
+        'editorCursor.foreground': '#00FF9C',
+        'editor.selectionBackground': '#00FF9C30',
+      },
     });
-    monaco.editor.setTheme('hackerDark');
+    monaco.editor.defineTheme('algo-light', {
+      base: 'vs', inherit: true, rules: [],
+      colors: {
+        'editor.background': '#FFFFFF',
+        'editorGutter.background': '#FFFFFF',
+        'editor.lineHighlightBackground': '#F6F8FA',
+        'editorLineNumber.foreground': '#8C959F',
+        'editorCursor.foreground': '#059669',
+        'editor.selectionBackground': '#05966928',
+      },
+    });
+  };
+
+  const handleEditorDidMount = (editor: any) => {
+    editorRef.current = editor;
   };
 
   const formatCode = () => {
@@ -151,29 +168,33 @@ export function CodeWorkspace({
     <div className="space-y-4">
       <GlowPanel className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 font-mono text-sm text-text-primary uppercase">
-            {languages.length > 0 ? languages.map(lang => <option key={lang.id} value={lang.id}>{lang.name}</option>) : <option value="C++">C++</option>}
-          </select>
-          <Button variant="ghost" onClick={formatCode} className="px-3 text-xs">Beautify</Button>
-          <Button variant="ghost" onClick={() => setEditorTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')} className="px-2" title="Toggle Editor Theme">
-            {editorTheme === 'vs-dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </Button>
-          <Badge label={isSubmitting ? 'Evaluating' : 'Draft saved locally'} tone={isSubmitting ? 'warn' : 'primary'} />
+          <div className="relative shrink-0">
+            <select value={language} onChange={(event) => setLanguage(event.target.value)} className="appearance-none w-28 rounded-md pl-3 pr-8 py-1.5 font-mono text-xs font-semibold uppercase tracking-widest border border-border-strong bg-bg-panel text-text-primary hover:border-text-muted hover:bg-bg-hover transition-all cursor-pointer outline-none focus:border-accent shadow-sm">
+              {languages.length > 0 ? languages.map(lang => <option key={lang.id} value={lang.id}>{lang.name}</option>) : <option value="C++">C++</option>}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-text-secondary">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+          </div>
+          <button onClick={formatCode} className="rounded-md px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-widest border border-border-strong bg-bg-panel text-text-secondary hover:text-text-primary hover:border-text-muted hover:bg-bg-hover transition-all">BEAUTIFY</button>
+          
+          {isSubmitting && <Badge label="Evaluating" tone="warn" />}
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={runCode} disabled={isRunning || isSubmitting || isTimingOut}>
+          <button onClick={runCode} disabled={isRunning || isSubmitting || isTimingOut} className="rounded-md px-4 py-1.5 font-mono text-xs font-semibold uppercase tracking-widest border border-border-strong bg-bg-panel text-text-secondary hover:text-text-primary hover:border-text-muted hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all">
             {isRunning ? 'Running...' : 'Run Code'}
-          </Button>
-          <Button variant="danger" onClick={() => { setRunResults(null); onSubmit(language, code); }} disabled={isSubmitting || isTimingOut}>
+          </button>
+          <button onClick={() => { setRunResults(null); onSubmit(language, code); }} disabled={isSubmitting || isTimingOut} className="rounded-md px-4 py-1.5 font-mono text-xs font-semibold uppercase tracking-widest border border-border-strong bg-bg-panel text-text-secondary hover:text-text-primary hover:border-text-muted hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all">
             {isTimingOut ? 'Resolving...' : isSubmitting ? 'Submitting...' : submitLabel}
-          </Button>
+          </button>
         </div>
       </GlowPanel>
       
       <GlowPanel className="p-0 overflow-hidden min-h-[390px] border border-border-hairline">
           <Editor
             height="400px"
-            theme={editorTheme}
+            beforeMount={defineThemes}
+            theme={isDark ? 'algo-dark' : 'algo-light'}
             language={monacoLanguage}
             value={code}
             onChange={(val) => setCode(val || '')}
@@ -195,7 +216,7 @@ export function CodeWorkspace({
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab as any)} 
-              className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${activeTab === tab ? 'border-accent-primary text-accent-primary' : 'border-border-hairline text-text-secondary'}`}
+              className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${activeTab === tab ? 'border-b-2 border-accent text-text-primary bg-bg-elevated' : 'border-transparent text-text-muted hover:text-text-primary'}`}
             >
               {tab === 'tests' ? 'Test Cases' : tab === 'output' ? 'Run Results' : 'Opponent'}
             </button>
@@ -218,9 +239,9 @@ export function CodeWorkspace({
                           <span className="text-text-primary">Sample {i + 1}</span>
                           <button className="text-xs text-accent-electric hover:text-white" onClick={() => navigator.clipboard.writeText(sample.input)}>Copy Input</button>
                         </div>
-                        <div className="bg-bg-void p-2 rounded mb-2 overflow-x-auto"><pre>{sample.input}</pre></div>
+                        <div className="bg-bg-elevated transition-colors duration-300 p-2 rounded mb-2 overflow-x-auto"><pre>{sample.input}</pre></div>
                         <span className="text-text-primary text-xs">Expected Output</span>
-                        <div className="bg-bg-void p-2 rounded overflow-x-auto"><pre>{sample.output}</pre></div>
+                        <div className="bg-bg-elevated transition-colors duration-300 p-2 rounded overflow-x-auto"><pre>{sample.output}</pre></div>
                     </div>
                   )) : <p>No samples available.</p>}
                 </div>
@@ -243,7 +264,7 @@ export function CodeWorkspace({
                             newInputs[index] = e.target.value;
                             setCustomInputs(newInputs);
                           }}
-                          className="w-full bg-bg-void border border-border-hairline rounded p-3 font-mono text-sm text-text-mono outline-none focus:border-accent-primary min-h-[100px]" 
+                          className="w-full bg-bg-elevated transition-colors duration-300 border border-border-hairline rounded p-3 font-mono text-sm text-text-mono outline-none focus:border-accent-primary min-h-[100px]" 
                           placeholder="Enter test case input..."
                         />
                     </div>
@@ -258,12 +279,12 @@ export function CodeWorkspace({
           <div className="font-mono text-sm">
             {!runResults && !error && !isSubmitting && <span className="text-text-secondary">{verdict}</span>}
             {isSubmitting && <span className="text-accent-warn">Running against hidden tests...</span>}
-            {error && <div className="mt-2 bg-bg-panel-raised p-4 rounded text-accent-danger font-mono text-xs overflow-x-auto whitespace-pre-wrap"><pre>{error}</pre></div>}
+            {error && <div className="mt-2 bg-bg-elevated transition-colors duration-300 p-4 rounded text-accent-danger font-mono text-xs overflow-x-auto whitespace-pre-wrap"><pre>{error}</pre></div>}
             
             {runResults && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-border-hairline">
-                      <span className={runResults.status.includes('Accepted') ? 'text-accent-primary' : 'text-accent-danger'}>
+                      <span className={runResults.status.includes('Accepted') ? 'text-success font-bold' : 'text-danger font-bold'}>
                         Verdict: {runResults.status}
                       </span>
                       <span className="text-text-secondary">Passed: {runResults.aggregated.passed}/{runResults.aggregated.total}</span>
@@ -271,10 +292,10 @@ export function CodeWorkspace({
                   
                   <div className="space-y-3">
                     {runResults.testCaseResults?.map((tc, idx) => (
-                      <div key={idx} className={`rounded-lg border p-3 ${tc.status === 'Accepted' || tc.status === 'SUCCESS' ? 'border-accent-primary/30' : 'border-accent-danger/30'}`}>
+                      <div key={idx} className={`rounded-lg border p-3 ${tc.status === 'Accepted' || tc.status === 'SUCCESS' ? 'border-success/30 bg-success/10' : 'border-danger/30 bg-danger/10'}`}>
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-xs uppercase text-text-secondary tracking-widest">Test Case {idx + 1}</span>
-                            <span className={`text-xs ${tc.status === 'Accepted' || tc.status === 'SUCCESS' ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                            <span className={`text-xs ${tc.status === 'Accepted' || tc.status === 'SUCCESS' ? 'text-success' : 'text-danger'}`}>
                               {tc.status} · {tc.executionTimeMs}ms
                             </span>
                           </div>
@@ -282,12 +303,12 @@ export function CodeWorkspace({
                           <div className="grid md:grid-cols-2 gap-3 mt-2">
                             <div>
                               <span className="text-[10px] uppercase text-text-secondary mb-1 block">Your Output</span>
-                              <div className="bg-bg-void p-2 rounded max-h-32 overflow-y-auto"><pre>{tc.output || 'No output'}</pre></div>
+                              <div className="bg-bg-elevated transition-colors duration-300 p-2 rounded max-h-32 overflow-y-auto"><pre>{tc.output || 'No output'}</pre></div>
                             </div>
                             {tc.expectedOutput && (
                               <div>
                                 <span className="text-[10px] uppercase text-text-secondary mb-1 block">Expected Output</span>
-                                <div className="bg-bg-void p-2 rounded max-h-32 overflow-y-auto"><pre>{tc.expectedOutput}</pre></div>
+                                <div className="bg-bg-elevated transition-colors duration-300 p-2 rounded max-h-32 overflow-y-auto"><pre>{tc.expectedOutput}</pre></div>
                               </div>
                             )}
                           </div>

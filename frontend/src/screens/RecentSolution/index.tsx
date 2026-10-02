@@ -38,7 +38,7 @@ export function RecentSolutionScreen({
   }, [submissionId]);
 
   return (
-    <main className="mx-auto max-w-[1400px] p-4 md:p-6 h-screen flex flex-col">
+    <main className="mx-auto w-full flex-1 flex flex-col p-4 md:p-6">
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
         <div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary">Review submission</p>
@@ -51,7 +51,7 @@ export function RecentSolutionScreen({
               className="animate-pulse-glow"
               onClick={() => onUpsolve(submission.problemId)}
             >
-              Make another submission
+              SOLVE
             </Button>
           )}
           <Button variant="ghost" onClick={onBack}>Back</Button>

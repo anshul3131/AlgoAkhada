@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AuthUser } from '../../lib/api';
+import logo from '../../../../backend/assets/AlgoAkhada_logo.png';
 
 interface AuthScreenProps {
   onAuthenticated?: (user: AuthUser) => void;
@@ -56,7 +57,7 @@ export function AuthScreen({ onAuthenticated, login, signup, isLoading, error }:
             className="absolute inset-0 -z-10 scale-110 rounded-full bg-gradient-to-tr from-accent-primary/30 via-transparent to-accent-electric/30 blur-3xl"
           />
           <img
-            src="/AlgoAkhada_logo.png"
+            src={logo}
             alt="AlgoAkhada"
             className="mx-auto w-[min(78vw,34rem)] drop-shadow-[0_0_48px_rgba(0,255,170,0.35)]"
             draggable={false}

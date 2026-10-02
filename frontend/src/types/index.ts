@@ -33,6 +33,7 @@ export interface ProblemListItem {
   tags: string[];
   timeLimit?: number;
   memoryLimit?: number;
+  isSolved?: boolean;
 }
 
 export interface ProblemTagListResponse {
@@ -110,3 +111,27 @@ export interface RealtimeEventMap {
 }
 
 export type RealtimeEventName = keyof RealtimeEventMap;
+
+export interface SubmissionListItem {
+  id: string;
+  status: string;
+  language: string;
+  executionTimeMs: number;
+  memoryUsedMb: number;
+  submittedAt: string;
+  problem: {
+    id: string;
+    title: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    tags: string[];
+    timeLimit?: number;
+    memoryLimit?: number;
+  };
+}
+
+export interface SubmissionListResponse {
+  items: SubmissionListItem[];
+  page: number;
+  limit: number;
+  total: number;
+}

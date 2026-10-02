@@ -1,3 +1,4 @@
+import logo from '../../../../backend/assets/AlgoAkhada_logo.png';
 import { Badge } from './Badge';
 
 interface Props {
@@ -5,20 +6,21 @@ interface Props {
   avatarUrl?: string | null;
   onDashboard: () => void;
   onProblems?: () => void;
+  onSubmissions?: () => void;
   onHome: () => void;
   onLogout?: () => void;
 }
 
-export function TopNav({ username, avatarUrl, onDashboard, onHome, onProblems, onLogout }: Props) {
+export function TopNav({ username, avatarUrl, onDashboard, onHome, onProblems, onSubmissions, onLogout }: Props) {
   const displayAvatar = avatarUrl || (username ? `https://api.dicebear.com/7.x/bottts/svg?seed=${username}` : null);
   return (
-    <div className="mx-auto w-full max-w-[1400px] p-4 pb-0 md:p-6 md:pb-0">
+    <div className="mx-auto w-full px-4 pt-4 md:px-6 md:pt-6">
       <div className="flex items-center justify-between rounded-xl border border-border-hairline bg-bg-panel p-3 shadow-sm">
         
         {/* Left Side: Avatar + Username + Branding */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={onHome}>
-            <img src="/AlgoAkhada_logo.png" alt="AlgoAkhada Logo" className="h-6 w-auto" />
+            <img src={logo} alt="AlgoAkhada Logo" className="h-6 w-auto" />
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-text-primary mt-0.5 hidden sm:block">
               AlgoAkhada
             </p>
@@ -54,6 +56,12 @@ export function TopNav({ username, avatarUrl, onDashboard, onHome, onProblems, o
             className="flex items-center justify-center h-8 px-3 rounded bg-bg-panel-raised border border-border-hairline hover:bg-bg-void hover:border-accent-primary transition-colors text-text-secondary hover:text-accent-primary font-mono text-[10px] uppercase tracking-[0.2em]"
           >
             Problems
+          </button>
+          <button 
+            onClick={onSubmissions}
+            className="flex items-center justify-center h-8 px-3 rounded bg-bg-panel-raised border border-border-hairline hover:bg-bg-void hover:border-accent-primary transition-colors text-text-secondary hover:text-accent-primary font-mono text-[10px] uppercase tracking-[0.2em]"
+          >
+            Submissions
           </button>
           <button 
             onClick={onDashboard}

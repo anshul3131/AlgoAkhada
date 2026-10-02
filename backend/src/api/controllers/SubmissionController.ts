@@ -1,4 +1,4 @@
-import { JsonController, Post, Get, Param, Body, Res, Authorized, Req } from "routing-controllers";
+import { JsonController, Post, Get, Param, QueryParam, Body, Res, Authorized, Req } from "routing-controllers";
 import { Response } from "express";
 import { submissionService } from "../../domain/services/SubmissionService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
@@ -51,6 +51,26 @@ export class SubmissionController {
             }
             
             return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+        }
+    }
+
+
+    @Get()
+    async getUserSubmissions(
+        @Req() req: any,
+        @QueryParam("page") page: number,
+        @QueryParam("limit") limit: number,
+        @QueryParam("status") status: string,
+        @QueryParam("topic") topic: string,
+        @Res() res: Response
+    ) {
+        const userId = req.user.id;
+        const serviceResponse = await submissionService.getUserSubmissions(userId, page, limit, status, topic);
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        }
+        else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
 

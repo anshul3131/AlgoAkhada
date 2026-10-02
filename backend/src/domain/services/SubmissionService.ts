@@ -61,6 +61,54 @@ export class SubmissionService {
         }
     }
 
+
+    async getUserSubmissions(userId: string, page: number, limit: number, status?: string, topic?: string): Promise<ResponseData> {
+        try {
+            page = page ? Number(page) : 1;
+            limit = limit ? Number(limit) : 20;
+
+            const subRepo = AppDataSource.getRepository(Submission);
+            const query = subRepo.createQueryBuilder("submission")
+                .leftJoinAndSelect("submission.problem", "problem")
+                .where("submission.user.id = :userId", { userId })
+                .orderBy("submission.submittedAt", "DESC")
+                .skip((page - 1) * limit)
+                .take(limit);
+
+            if (status) {
+                query.andWhere("submission.status = :status", { status });
+            }
+
+            if (topic) {
+                query.andWhere("problem.tags LIKE :topic", { topic: `%${topic}%` });
+            }
+
+            const [submissions, total] = await query.getManyAndCount();
+
+            const items = submissions.map(s => ({
+                id: s.id,
+                status: s.status,
+                language: s.language,
+                executionTimeMs: s.executionTimeMs,
+                memoryUsedMb: s.memoryUsedMb,
+                submittedAt: s.submittedAt,
+                problem: s.problem ? {
+                    id: s.problem.id,
+                    title: s.problem.title,
+                    difficulty: s.problem.difficulty,
+                    tags: s.problem.tags,
+                    timeLimit: s.problem.timeLimit,
+                    memoryLimit: s.problem.memoryLimit
+                } : null
+            }));
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { items, total, page, limit });
+        } catch (error: any) {
+            console.error(`[SubmissionService] getUserSubmissions error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
     async getSubmissionById(submissionId: string): Promise<ResponseData> {
         try {
             if (!submissionId) {

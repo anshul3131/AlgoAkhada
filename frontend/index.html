@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/png" href="/AlgoAkhada_logo.png" />
+    <link rel="icon" type="image/png" href="../backend/assets/AlgoAkhada_logo.png" />
     <title>AlgoAkhada Arena</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('algoakhada-theme');
+          var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-bg-void">
     <div id="root"></div>

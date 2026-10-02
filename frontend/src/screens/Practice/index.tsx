@@ -7,6 +7,7 @@ import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimePr
 import { problemApi, submissionApi, executionApi, type ProblemRecord, type LanguageRecord } from '../../lib/api';
 import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
 import { SplitLayout } from '../../components/shared/SplitLayout';
+import { ThemeToggle } from '../../components/shared/ThemeToggle';
 
 export function PracticeScreen({
   userId,
@@ -82,7 +83,7 @@ export function PracticeScreen({
   };
 
   return (
-    <main className="mx-auto max-w-[1500px] p-4 md:p-6">
+    <main className="mx-auto w-full flex-1 flex flex-col p-4 md:p-6">
       {submissionResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <GlowPanel className={`w-full max-w-xl space-y-6 p-8 text-center shadow-[0_0_20px_rgba(76,255,190,0.18)] ${submissionResult.status === 'Accepted' ? 'shadow-[0_0_20px_rgba(76,255,190,0.18)] border-accent-primary/50' : 'shadow-[0_0_20px_rgba(255,92,92,0.18)] border-accent-danger/50'}`}>
@@ -131,6 +132,7 @@ export function PracticeScreen({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" onClick={onBack}>Back</Button>
         </div>
       </GlowPanel>
@@ -179,7 +181,8 @@ export function PracticeScreen({
         </div>
       )}
 
-      <SplitLayout
+      <div className="flex-1 min-h-0 mt-4">
+        <SplitLayout
         left={
           <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
             <div className="flex items-center justify-between">
@@ -188,7 +191,17 @@ export function PracticeScreen({
             </div>
 
             <div>
-              <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
+              <h1 className="text-2xl font-semibold text-text-primary flex items-center gap-3">
+                {problem?.title ?? 'Loading problem...'}
+                {problem?.pastSubmissions?.some(s => s.status === 'Accepted') && (
+                  <div className="flex items-center h-5 gap-1 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-2 text-[10px] font-bold uppercase tracking-widest text-accent-primary shrink-0">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Solved
+                  </div>
+                )}
+              </h1>
               <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the upsolve problem details.' }}></div>
             </div>
 
@@ -207,7 +220,7 @@ export function PracticeScreen({
             problem={problem}
             languages={languages}
             isSubmitting={isSubmitting}
-            submitLabel="Submit solution"
+            submitLabel="Submit"
             onSubmit={submit}
             verdict={verdict}
             setVerdict={setVerdict}
@@ -221,6 +234,7 @@ export function PracticeScreen({
           />
         }
       />
+    </div>
     </main>
   );
 }

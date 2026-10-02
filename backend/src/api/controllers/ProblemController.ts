@@ -44,9 +44,11 @@ export class ProblemController {
         @QueryParam("difficulty") difficulty: string,
         @QueryParam("search") search: string,
         @QueryParam("tag") tag: string,
+        @Req() req: any,
         @Res() res: Response
     ) {
-        const serviceResponse = await problemService.getAllProblems(page, limit, difficulty, search, tag);
+        const userId = req.user?.id;
+        const serviceResponse = await problemService.getAllProblems(page, limit, difficulty, search, tag, userId);
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
             return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
         } else {

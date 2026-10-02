@@ -9,6 +9,7 @@ import { PracticeScreen } from './screens/Practice';
 import { RecentSolutionScreen } from './screens/RecentSolution';
 import { TagExplorerScreen } from './screens/TagExplorer';
 import { ProblemsScreen } from './screens/Problems';
+import { SubmissionsScreen } from './screens/Submissions';
 import { useAuth } from './hooks/useAuth';
 import { RealtimeProvider, useRealtimeEvent, useSocket } from './providers/RealtimeProvider';
 import { CustomLobbyScreen } from './screens/CustomLobby';
@@ -19,7 +20,7 @@ import { CustomBattleground } from './screens/CustomBattleground';
 import { SpectatorScreen } from './screens/Spectator';
 import type { AuthUser } from './lib/api';
 
-type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby' | 'dashboard' | 'spectator' | 'problems';
+type Screen = 'lobby' | 'queue' | 'battle' | 'custom-battle' | 'aftermath' | 'solution-review' | 'upsolve' | 'tag-explorer' | 'custom-lobby' | 'dashboard' | 'spectator' | 'problems' | 'submissions';
 type MatchContext = { matchId: string; problemId: string; players?: { id: string, username: string }[]; startTime?: string; };
 
 function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
@@ -196,7 +197,8 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
           username={user.username} 
           avatarUrl={user.avatar_url} 
           onDashboard={() => setScreen('dashboard')}
-          onProblems={() => setScreen('problems')} 
+          onProblems={() => setScreen('problems')}
+          onSubmissions={() => setScreen('submissions')} 
           onHome={() => setScreen('lobby')}
           onLogout={logout} 
         />
@@ -246,6 +248,11 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
             setPracticeProblemId(problemId);
             setScreen('upsolve');
           }}
+        />
+      )}
+      {screen === 'submissions' && (
+        <SubmissionsScreen
+          onReviewSolution={onReviewSolution}
         />
       )}
       {screen === 'tag-explorer' && (

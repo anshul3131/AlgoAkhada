@@ -1,4 +1,4 @@
-import { Submission } from "../entities/Submission";
+import { Submission, SubmissionStatus } from "../entities/Submission";
 
 import { Problem, ProblemDifficulty } from "../entities/Problem";
 import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
@@ -39,21 +39,32 @@ export class ProblemService {
         }
     }
 
-    async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string): Promise<ResponseData> {
+    async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string, userId?: string): Promise<ResponseData> {
         try {
             page = page ? Number(page) : 1;
             limit = limit ? Number(limit) : 20;
 
             const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
             
-            const responsePayload: ProblemListResponseDTO = {
+            let solvedProblemIds = new Set<string>();
+            if (userId) {
+                const subRepo = AppDataSource.getRepository(Submission);
+                const solvedSubs = await subRepo.find({
+                    where: { user: { id: userId }, status: SubmissionStatus.ACCEPTED },
+                    relations: { problem: true }
+                });
+                solvedProblemIds = new Set(solvedSubs.map(s => s.problem.id));
+            }
+
+            const responsePayload: any = {
                 items: result.problems.map(p => ({
                     id: p.id,
                     title: p.title,
                     difficulty: p.difficulty,
                     tags: p.tags || [],
                     timeLimit: p.timeLimit,
-                    memoryLimit: p.memoryLimit
+                    memoryLimit: p.memoryLimit,
+                    isSolved: solvedProblemIds.has(p.id)
                 })),
                 page: result.page,
                 limit: result.limit,
@@ -102,6 +113,7 @@ export class ProblemService {
                     order: { submittedAt: 'DESC' },
                     select: { id: true, status: true, language: true, submittedAt: true, executionTimeMs: true }
                 });
+                console.log("pastSubs for problem", id, userId, ":", pastSubs);
                 if (pastSubs.length > 0) {
                     payload.pastSubmissions = pastSubs;
                 }

@@ -1,4 +1,4 @@
-import type { ProblemListItem, RecentMatchRecord, SubmissionDetailRecord } from '../types';
+import type { ProblemListItem, RecentMatchRecord, SubmissionDetailRecord, SubmissionListResponse } from '../types';
 
 const API_BASE = (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ?? '/api';
 
@@ -167,6 +167,15 @@ export const matchApi = {
 };
 
 export const submissionApi = {
+
+  getSubmissions: (params?: { page?: number; limit?: number; status?: string; topic?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.limit) query.append("limit", String(params.limit));
+    if (params?.status) query.append("status", params.status);
+    if (params?.topic) query.append("topic", params.topic);
+    return request<SubmissionListResponse>(`/submissions?${query.toString()}`);
+  },
   getSubmission: (submissionId: string) => request<SubmissionDetailRecord>(`/submissions/${submissionId}`),
 
   submitCode: (payload: {

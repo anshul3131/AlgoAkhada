@@ -15,7 +15,7 @@ export function SplitLayout({
   minLeftWidth = 250,
   minRightWidth = 400,
 }: SplitLayoutProps) {
-  const [leftWidth, setLeftWidth] = useState(initialLeftWidth);
+  const [leftWidth, setLeftWidth] = useState(() => window.innerWidth >= 1280 ? Math.floor(window.innerWidth * 0.4) : initialLeftWidth);
   const [isDragging, setIsDragging] = useState(false);
   const [isXl, setIsXl] = useState(window.innerWidth >= 1280);
   const containerRef = useRef<HTMLDivElement>(null);

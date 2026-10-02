@@ -33,6 +33,10 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
   const [difficulties, setDifficulties] = useState<Difficulty[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [topicSearch, setTopicSearch] = useState('');
+  const [hideTags, setHideTags] = useState(false);
+  const [hideSolved, setHideSolved] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -62,12 +66,23 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
     return problems.filter((p) => {
       if (q && !p.title.toLowerCase().includes(q)) return false;
       if (difficulties.length && !difficulties.includes(p.difficulty)) return false;
+      if (hideSolved && p.isSolved) return false;
       if (topics.length && !topics.every((t) => p.tags?.includes(t))) return false;
       return true;
     });
-  }, [problems, query, difficulties, topics]);
+  }, [problems, query, difficulties, topics, hideSolved]);
 
-  const hasFilters = query !== '' || difficulties.length > 0 || topics.length > 0;
+  const hasFilters = query !== '' || difficulties.length > 0 || topics.length > 0 || hideTags || hideSolved;
+
+  // Reset page to 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, difficulties, topics, hideSolved]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filtered, currentPage]);
 
   const clearAll = () => {
     setQuery('');
@@ -157,6 +172,30 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
           </fieldset>
 
           <fieldset>
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-border-hairline bg-bg-panel-raised p-3">
+              <div>
+                <div className="text-sm font-medium text-text-primary">Hide Tags</div>
+                <div className="text-xs text-text-secondary">Hide topics on problems</div>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" className="peer sr-only" checked={hideTags} onChange={e => setHideTags(e.target.checked)} />
+                <div className="peer h-6 w-11 rounded-full bg-border-hairline after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+              </label>
+            </div>
+            
+            <div className="mb-6 flex items-center justify-between rounded-lg border border-border-hairline bg-bg-panel-raised p-3">
+              <div>
+                <div className="text-sm font-medium text-text-primary">Hide Solved</div>
+                <div className="text-xs text-text-secondary">Hide problems you've completed</div>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" className="peer sr-only" checked={hideSolved} onChange={e => setHideSolved(e.target.checked)} />
+                <div className="peer h-6 w-11 rounded-full bg-border-hairline after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
             <div className="mb-2 flex items-center justify-between">
               <legend className="text-xs text-text-secondary">
                 Topics{topics.length > 0 && ` (${topics.length} selected)`}
@@ -216,8 +255,9 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
           {loading ? (
             <div className="rounded-xl border border-dashed border-white/10 bg-zinc-900/40 px-6 py-16 text-center text-text-secondary">Loading problems...</div>
           ) : filtered.length > 0 ? (
+            <>
             <div className="flex flex-col gap-3">
-              {filtered.map((problem) => (
+              {paginated.map((problem) => (
                 <button
                   key={problem.id}
                   onClick={() => onSolveProblem(problem.id)}
@@ -225,9 +265,17 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                 >
                   <div>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold text-text-primary group-hover:text-accent-primary transition-colors">{problem.title}</h2>
+                      <h2 className="text-xl font-semibold text-text-primary group-hover:text-accent-primary transition-colors flex items-center gap-2">
+                        {problem.title}
+                        {problem.isSolved && (
+                          <svg className="w-5 h-5 text-accent-primary" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </h2>
                       <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'primary' : problem.difficulty === 'Hard' ? 'danger' : 'electric'} />
                     </div>
+                    {!hideTags && (
                     <div className="flex flex-wrap gap-2">
                       {problem.tags?.map((tag) => (
                         <span key={tag} className="rounded-full border border-border-hairline bg-bg-panel-raised px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-text-secondary group-hover:border-accent-primary/30 transition-colors">
@@ -235,6 +283,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                         </span>
                       ))}
                     </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="mr-2 hidden rounded-lg border border-border-hairline bg-bg-panel-raised px-3 py-2 text-xs uppercase tracking-[0.18em] text-text-secondary md:block group-hover:border-accent-primary/30 group-hover:text-text-primary transition-colors">
@@ -244,6 +293,28 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                 </button>
               ))}
             </div>
+            {true && (
+                <div className="mt-6 flex items-center justify-between rounded-xl border border-white/5 bg-bg-panel-raised px-4 py-3">
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-mono text-text-secondary">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-white/10 bg-zinc-900/40 px-6 py-16 text-center">
               <p className="text-lg font-semibold text-text-primary">No problems match these filters</p>

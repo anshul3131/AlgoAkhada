@@ -4,33 +4,66 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color: #f2f2f5;
-  background: #0a0a0f;
-  font-family: 'Inter', sans-serif;
-}
+@layer base {
+  /* Light: soft GitHub/Vercel-style, never pure white canvas */
+  :root {
+    color-scheme: light;
+    --bg-void: 246 248 250;        /* #F6F8FA canvas */
+    --bg-panel: 255 255 255;       /* cards/panes */
+    --bg-elevated: 240 243 246;    /* inputs, code blocks */
+    --bg-hover: 232 236 241;
+    --border-subtle: 221 226 232;
+    --border-strong: 196 203 212;
+    --text-primary: 31 35 40;      /* #1F2328 */
+    --text-secondary: 61 68 77;
+    --text-muted: 101 109 118;
+    --accent: 5 150 105;           /* emerald, readable on light */
+    --accent-fg: 255 255 255;
+    --success: 26 127 55;
+    --danger: 207 34 46;
+    --warning: 154 103 0;
+    --shadow-panel: 0 1px 2px rgb(31 35 40 / 0.04), 0 8px 24px rgb(31 35 40 / 0.06);
+    --shadow-glow: 0 0 0 3px rgb(5 150 105 / 0.15);
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(0, 255, 156, 0.08), transparent 20%),
-    #0a0a0f;
-}
+  .dark {
+    color-scheme: dark;
+    --bg-void: 10 10 15;           /* #0A0A0F */
+    --bg-panel: 19 19 26;          /* #13131A */
+    --bg-elevated: 27 27 37;
+    --bg-hover: 36 36 49;
+    --border-subtle: 38 38 52;
+    --border-strong: 58 58 78;
+    --text-primary: 242 242 245;   /* #F2F2F5 */
+    --text-secondary: 180 180 194;
+    --text-muted: 120 120 138;
+    --accent: 0 255 156;           /* #00FF9C */
+    --accent-fg: 10 10 15;
+    --success: 0 255 156;
+    --danger: 255 85 105;
+    --warning: 255 184 77;
+    --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.02), 0 12px 32px rgb(0 0 0 / 0.5);
+    --shadow-glow: 0 0 18px rgb(0 255 156 / 0.25);
+  }
 
-* {
-  box-sizing: border-box;
-}
+  html { @apply antialiased; }
+  body { @apply bg-bg-void text-text-primary font-sans; }
 
-::-webkit-scrollbar {
-  width: 8px;
-}
+  /* Smooth theme switch on surfaces only (avoids sluggish hover/animations everywhere) */
+  body, .theme-surface {
+    transition: background-color 300ms, color 300ms, border-color 300ms;
+  }
 
-::-webkit-scrollbar-track {
-  background: #13131a;
-}
+  ::selection { background: rgb(var(--accent) / 0.25); }
 
-::-webkit-scrollbar-thumb {
-  background: #2a2a38;
+  /* Themed scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: rgb(var(--border-strong)) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(var(--border-strong));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--text-muted)); background-clip: content-box; }
 }

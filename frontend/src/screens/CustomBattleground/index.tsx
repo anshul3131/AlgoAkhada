@@ -129,7 +129,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
   };
 
   return (
-    <main className="mx-auto max-w-[1500px] p-4 md:p-6">
+    <main className="mx-auto w-full flex-1 flex flex-col p-4 md:p-6">
       <GlowPanel className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <Badge label="CUSTOM MATCH" tone="danger" />
@@ -166,7 +166,8 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
           )}
         </div>
       </GlowPanel>
-      <SplitLayout
+      <div className="flex-1 min-h-0 mt-4">
+        <SplitLayout
         left={
           <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
             <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
@@ -184,7 +185,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
             languages={languages}
             isSubmitting={isSubmitting}
             isTimingOut={isTimingOut}
-            submitLabel="Submit Solution"
+            submitLabel="Submit"
             onSubmit={submit}
             onCodeChange={(c, l) => updateMatchCode(lobbyId, c, l)}
             verdict={verdict}
@@ -290,6 +291,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
           </GlowPanel>
         </div>
       )}
+    </div>
     </main>
   );
 }
