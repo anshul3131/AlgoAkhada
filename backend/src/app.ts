@@ -19,6 +19,10 @@ app.use(cookieParser());
 
 // Register Controllers using routing-controllers
 useExpressServer(app, {
+    cors: {
+        origin: true,
+        credentials: true
+    },
     controllers: [AuthController, ProblemController, SubmissionController, TestCaseController, RecentMatchController, ExecutionController, CustomMatchController, UserController, DashboardController], // Add other controllers as needed
     // We disable the default error handler to strictly use our custom ResponseBuilder
 
