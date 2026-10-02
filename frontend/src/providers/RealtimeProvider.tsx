@@ -28,7 +28,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], withCredentials: true });
+    const socket = io(SOCKET_URL, { 
+      transports: ['websocket', 'polling'], 
+      withCredentials: true,
+      extraHeaders: { 'Bypass-Tunnel-Reminder': 'true' }
+    });
     socketRef.current = socket;
     socket.on('connect', () => { setConnected(true); setError(null); });
     socket.on('disconnect', () => setConnected(false));

@@ -62,6 +62,7 @@ async function request<T>(path: string, init?: RequestInit, allowRefresh = true)
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true',
         ...(init?.headers ?? {}),
       },
     });
@@ -95,9 +96,9 @@ async function request<T>(path: string, init?: RequestInit, allowRefresh = true)
     const e = err as any;
     if (allowRefresh && (e?.status === 401 || e?.message?.toLowerCase().includes('unauthorized'))) {
       try {
-        const refreshResp = await fetch(`${API_BASE}/users/refresh`, { method: 'POST', credentials: 'include' });
+        const refreshResp = await fetch(`${API_BASE}/users/refresh`, { method: 'POST', credentials: 'include', headers: { 'Bypass-Tunnel-Reminder': 'true' } });
         if (!refreshResp.ok) {
-          await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
+          await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include', headers: { 'Bypass-Tunnel-Reminder': 'true' } }).catch(() => undefined);
           throw new Error('Session expired');
         }
 
@@ -125,7 +126,7 @@ export const authApi = {
     }),
   refresh: () => request<void>('/users/refresh', { method: 'POST' }),
   logout: async () => {
-    await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include' });
+    await fetch(`${API_BASE}/users/logout`, { method: 'POST', credentials: 'include', headers: { 'Bypass-Tunnel-Reminder': 'true' } });
   },
 };
 
