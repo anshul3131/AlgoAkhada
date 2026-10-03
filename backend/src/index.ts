@@ -97,7 +97,7 @@ async function startServer(): Promise<void> {
 
         // Initialize WebSockets
         const io = new Server(server, {
-            cors: { origin: "*" } // Configure this securely in production
+            cors: { origin: true, credentials: true } // Properly handles cross-origin credentials
         });
 
         io.use((socket, next) => {
