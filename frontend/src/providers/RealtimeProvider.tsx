@@ -71,7 +71,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     leaveMatch: (matchId) => socketRef.current?.emit('leave_match', matchId),
     finishMatchOnTimeout: (matchId) => socketRef.current?.emit('match_timeout', matchId),
     forfeitMatch: (matchId) => socketRef.current?.emit('forfeit_match', matchId),
-    subscribeToSubmission: (submissionId) => socketRef.current?.emit('subscribeToSubmission', submissionId),
+    subscribeToSubmission: (submissionId) => socketRef.current?.emit('subscribe_submission', submissionId),
     updateMatchCode: (matchId, code, language) => socketRef.current?.emit('match_code_update', { matchId, code, language }),
     emit: (eventName, payload) => socketRef.current?.emit(eventName, payload),
     subscribe: (eventName, handler) => {
