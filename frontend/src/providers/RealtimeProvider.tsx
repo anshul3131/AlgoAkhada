@@ -31,7 +31,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const socket = io(SOCKET_URL, { 
       transports: ['websocket', 'polling'], 
       withCredentials: true,
-      extraHeaders: { 'Bypass-Tunnel-Reminder': 'true' }
+      extraHeaders: { 'Bypass-Tunnel-Reminder': 'true',
+      'ngrok-skip-browser-warning': 'true' }
     });
     socketRef.current = socket;
     socket.on('connect', () => { setConnected(true); setError(null); });
