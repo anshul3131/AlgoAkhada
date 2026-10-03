@@ -42,6 +42,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const events: RealtimeEventName[] = ['queue_status', 'match_found', 'opponent_status', 'match_result', 'elo_update', 'evaluation_complete', 'custom_lobby_invite_received', 'custom_lobby_updated', 'custom_lobby_joined', 'custom_match_started', 'custom_lobby_declined', 'custom_lobby_left', 'custom_match_result', 'custom_lobby_submission', 'custom_lobby_chat_message', 'custom_lobby_chat_typing', 'webrtc_offer', 'webrtc_answer', 'webrtc_ice_candidate', 'rematch_requested', 'rematch_declined', 'spectator_code_update', 'spectator_count', 'error', 'public_lobbies_updated'];
     events.forEach((eventName) => {
       socket.on(eventName, (payload) => {
+        console.log(`[WS Event] ${eventName}:`, payload);
         listenersRef.current[eventName]?.forEach((handler) => handler(payload as never));
       });
     });
