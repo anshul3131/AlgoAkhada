@@ -20,8 +20,8 @@ export class AuthController {
 
         const serviceResponse = await authService.signUp(body);
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
+            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
             return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
         } else {
             const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
@@ -41,8 +41,8 @@ export class AuthController {
 
         const serviceResponse = await authService.login(body);
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
+            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
             return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
         } else {
             const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
@@ -64,8 +64,8 @@ export class AuthController {
 
         const serviceResponse = await authService.refreshAccessToken({ refreshToken, ipAddress, userAgent });
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
+            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
             res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
             return res;
         } else {
@@ -81,8 +81,8 @@ export class AuthController {
         const serviceResponse = await authService.logout(userId);
         
         // Clear cookies
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+        res.clearCookie('accessToken', { secure: true, sameSite: 'none' });
+        res.clearCookie('refreshToken', { secure: true, sameSite: 'none' });
         
         if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
             res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
