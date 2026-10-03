@@ -53,8 +53,8 @@ class KafkaConsumerClient {
         this.consumer = kafka.consumer({
             groupId: 'cp-arena-consumer', // Keep whatever your group ID is
 
-            // Decrease session timeout to 30 seconds so ghost consumers are kicked out faster
-            sessionTimeout: 30000,
+            // Increase session timeout to 5 minutes so long docker exec loops don't get kicked out!
+            sessionTimeout: 300000,
 
             // Heartbeat interval pings Kafka to let it know the worker is still alive
             heartbeatInterval: 10000,
