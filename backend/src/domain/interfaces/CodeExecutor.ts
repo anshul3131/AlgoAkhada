@@ -40,7 +40,7 @@ export abstract class CodeExecutor {
         const jobId = uuidv4();
         const jobFolder = path.join(this.tempDir, jobId);
         const sourceFile = path.join(jobFolder, `main.${this.fileExtension}`);
-        const executable = path.join(jobFolder,`main.${this.executableExtension}`);
+        const executable = path.join(jobFolder, `main.${this.executableExtension}`);
 
         const globalTimeLimitMs = timeLimit * 1000;
         const testCaseResults: TestCaseExecutionResult[] = [];
@@ -50,41 +50,91 @@ export abstract class CodeExecutor {
             await fs.mkdir(jobFolder, { recursive: true });
             await fs.writeFile(sourceFile, code);
 
-            // 2. Compile Natively (No Docker)
+            // 2. Compile Natively
             const compileResult = await this.compileNative(sourceFile, executable, jobFolder);
             if (!compileResult.success) {
                 console.error("🚨 Native Compilation Error:", compileResult.error);
                 return { status: SubmissionStatus.COMPILATION_ERROR, passed: 0, total: testCases.length, testCaseResults: [], compileError: compileResult.error || "" };
             }
 
-            // 3. Execute Native Code
+            // 3. Write all inputs and generate runner.sh
+            for (let i = 0; i < testCases.length; i++) {
+                const tc = testCases[i];
+                if (!tc) continue;
+                const inputFilePath = path.join(jobFolder, `input_${i}.txt`);
+                await fs.writeFile(inputFilePath, tc.input.trim() + '\n');
+            }
+
+            const runnerScript = `#!/bin/bash
+ulimit -v 256000
+ulimit -u 64
+TEST_COUNT=$1
+COMMAND=$2
+GLOBAL_TLE_MS=$3
+
+total_time=0
+for ((i=0; i<TEST_COUNT; i++)); do
+    start_time=$(date +%s%3N)
+    
+    timeout 5s bash -c "$COMMAND < input_$i.txt > output_$i.txt 2> stderr_$i.txt"
+    EXIT_CODE=$?
+    
+    end_time=$(date +%s%3N)
+    exec_time=$((end_time - start_time))
+    total_time=$((total_time + exec_time))
+    
+    echo "$EXIT_CODE,$exec_time" > status_$i.txt
+
+    if [ $total_time -gt $GLOBAL_TLE_MS ]; then
+        break
+    fi
+done
+`;
+            await fs.writeFile(path.join(jobFolder, 'runner.sh'), runnerScript);
+            await fs.chmod(path.join(jobFolder, 'runner.sh'), 0o777);
+
+            // 4. Run the batch script (1 single docker exec overhead!)
+            await this.runBatch(executable, jobFolder, testCases.length, globalTimeLimitMs);
+
+            // 5. Evaluate the results
             let passedCount = 0;
             let totalExecutionTimeMs = 0;
 
-            for (const tc of testCases) {
-                const inputFilePath = path.join(jobFolder, 'input.txt');
-                await fs.writeFile(inputFilePath, tc.input.trim() + '\n');
+            for (let i = 0; i < testCases.length; i++) {
+                const tc = testCases[i];
+                if (!tc) continue;
 
-                const remainingTimeMs = globalTimeLimitMs - totalExecutionTimeMs;
+                let output = "";
+                let stderrData = "";
+                let exitCode = -1;
+                let execTime = 0;
 
-                // Run the compiled binary directly
-                const result = await this.runNative(executable, inputFilePath, jobFolder, remainingTimeMs);
+                try {
+                    output = await fs.readFile(path.join(jobFolder, `output_${i}.txt`), 'utf8');
+                    stderrData = await fs.readFile(path.join(jobFolder, `stderr_${i}.txt`), 'utf8');
+                    const statusStr = await fs.readFile(path.join(jobFolder, `status_${i}.txt`), 'utf8');
+                    const parts = statusStr.trim().split(',');
+                    exitCode = parseInt(parts[0] || "-1", 10);
+                    execTime = parseInt(parts[1] || "0", 10);
+                } catch (e) {
+                    // File doesn't exist, which means runner.sh halted early due to global TLE!
+                    exitCode = -1;
+                }
 
-                totalExecutionTimeMs += (result.executionTimeMs || 0);
-                
+                totalExecutionTimeMs += execTime;
+
                 let tcStatus: SubmissionStatus = SubmissionStatus.ACCEPTED;
                 let tcPassed = false;
 
-                // Global TLE Check
-                if (totalExecutionTimeMs > globalTimeLimitMs || result.status === 'Time Limit Exceeded') {
+                if (exitCode === -1 || totalExecutionTimeMs > globalTimeLimitMs) {
                     tcStatus = SubmissionStatus.TIME_LIMIT_EXCEEDED;
-                } else if (result.status !== SubmissionStatus.SUCCESS) {
-                    tcStatus = result.status;
+                } else if (exitCode === 124 || exitCode === 137) {
+                    tcStatus = SubmissionStatus.TIME_LIMIT_EXCEEDED;
+                } else if (exitCode !== 0) {
+                    tcStatus = SubmissionStatus.RUNTIME_ERROR;
                 } else {
-                    // Output Comparison
-                    // In runMode, if expectedOutput is completely empty (e.g., custom testcase), we treat it as passed
                     const isCustomRunMode = isRunMode && (!tc.expectedOutput || tc.expectedOutput.trim() === "");
-                    if (isCustomRunMode || result.output.trim() === tc.expectedOutput?.trim()) {
+                    if (isCustomRunMode || output.trim() === tc.expectedOutput?.trim()) {
                         tcPassed = true;
                         passedCount++;
                     } else {
@@ -97,33 +147,33 @@ export abstract class CodeExecutor {
                         testCaseId: tc.id,
                         input: tc.input,
                         status: tcStatus,
-                        output: result.output,
+                        output: output,
                         expectedOutput: tc.expectedOutput || "",
-                        executionTimeMs: result.executionTimeMs || 0
+                        executionTimeMs: execTime
                     });
                 }
 
-                // If not in run mode, halt early on failure to save resources
                 if (!isRunMode && !tcPassed) {
                     return { status: tcStatus, passed: passedCount, total: testCases.length, failedTestCase: tc, executionTimeMs: totalExecutionTimeMs };
                 }
             }
+
             let finalStatus = SubmissionStatus.ACCEPTED;
             if (isRunMode && passedCount < testCases.length) {
                 const firstFailed = testCaseResults.find(r => r.status !== SubmissionStatus.SUCCESS && r.status !== 'Accepted');
                 finalStatus = firstFailed ? firstFailed.status as SubmissionStatus : SubmissionStatus.WRONG_ANSWER;
             }
-            
+
             return { status: finalStatus, passed: passedCount, total: testCases.length, testCaseResults: isRunMode ? testCaseResults : undefined, executionTimeMs: totalExecutionTimeMs } as ExecutionResult;
 
         } finally {
-            // 4. Cleanup
+            // Cleanup
             await fs.rm(jobFolder, { recursive: true, force: true }).catch(() => { });
         }
     }
 
     protected abstract compileNative(sourcePath: string, outPath: string, jobFolder: string): Promise<{ success: boolean; error?: string }>;
 
-    protected abstract runNative(executablePath: string, inputPath: string, jobFolder: string, remainingTimeMs: number): Promise<{ status: any, output: string, executionTimeMs?: number }>;
+    protected abstract runBatch(executablePath: string, jobFolder: string, testCount: number, globalTimeLimitMs: number): Promise<void>;
 }
 
