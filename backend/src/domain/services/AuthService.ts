@@ -35,8 +35,6 @@ export class AuthService {
 
             // Store transient session token in Redis (7 days TTL)
             await redisClient.client.setEx(`refresh_token:${newUser.id}`, 7 * 24 * 3600, refreshToken);
-            // Targeted update in Postgres via UserRepository
-            await userRepository.updateRefreshToken(newUser.id, refreshToken);
 
             const data: AuthResponseDTO = {
                 user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating, max_elo_rating: newUser.max_elo_rating, avatar_url: newUser.avatar_url },
@@ -69,9 +67,8 @@ export class AuthService {
             // 1. Store transient session token in Redis (7-day TTL)
             await redisClient.client.setEx(`refresh_token:${user.id}`, 7 * 24 * 3600, refreshToken);
 
-            // 2. Persist audit metadata & token in Postgres via UserRepository methods
+            // 2. Persist audit metadata in Postgres via UserRepository method
             await userRepository.updateLoginMetadata(user.id, loginRequest.ipAddress, loginRequest.userAgent);
-            await userRepository.updateRefreshToken(user.id, refreshToken);
 
             const data: AuthResponseDTO = {
                 user: { id: user.id, email: user.email, username: user.username, elo_rating: user.elo_rating, max_elo_rating: user.max_elo_rating, avatar_url: user.avatar_url },
@@ -90,16 +87,8 @@ export class AuthService {
         try {
             const decoded = jwt.verify(refreshRequest.refreshToken, this.jwtRefreshSecret) as { id: string };
 
-            // 1. Check Redis for fast transient session lookup
-            let storedRefreshToken = await redisClient.client.get(`refresh_token:${decoded.id}`);
-
-            // Fallback to PostgreSQL for migration compatibility
-            if (!storedRefreshToken) {
-                const dbUser = await userRepository.getUserById(decoded.id);
-                if (dbUser && dbUser.refresh_token) {
-                    storedRefreshToken = dbUser.refresh_token;
-                }
-            }
+            // 1. Check Redis for active session
+            const storedRefreshToken = await redisClient.client.get(`refresh_token:${decoded.id}`);
 
             if (!storedRefreshToken) {
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, RESPONSE_MESSAGES.INVALID_TOKEN);
@@ -109,19 +98,14 @@ export class AuthService {
             if (storedRefreshToken !== refreshRequest.refreshToken) {
                 console.warn(`[SECURITY ALERT] Token mismatch theft detected for user ID: ${decoded.id}`);
                 await redisClient.client.del(`refresh_token:${decoded.id}`);
-                await userRepository.clearRefreshToken(decoded.id);
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, "Security Alert: Invalid token. Account secured and logged out.");
             }
 
             const newAccessToken = this.generateAccessToken(decoded.id);
             const newRefreshToken = this.generateRefreshToken(decoded.id);
 
-            // Update session token in Redis
+            // Purely in-memory session rotation in Redis (sub-millisecond, zero Postgres disk I/O)
             await redisClient.client.setEx(`refresh_token:${decoded.id}`, 7 * 24 * 3600, newRefreshToken);
-
-            // Persist updated audit metadata and token in Postgres via UserRepository
-            await userRepository.updateLoginMetadata(decoded.id, refreshRequest.ipAddress, refreshRequest.userAgent);
-            await userRepository.updateRefreshToken(decoded.id, newRefreshToken);
 
             const data = {
                 accessToken: newAccessToken,
@@ -138,7 +122,6 @@ export class AuthService {
     public async logout(userId: string): Promise<ResponseData> {
         try {
             await redisClient.client.del(`refresh_token:${userId}`);
-            await userRepository.clearRefreshToken(userId);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS);
         } catch(error: any) {
             console.error(`[AuthService] logout error: ${error.message}`);
