@@ -34,6 +34,21 @@ export class UserRepository extends Repository<User> {
             .take(limit)
             .getMany();
     }
+
+    async updateLoginMetadata(userId: string, ipAddress?: string | null, userAgent?: string | null): Promise<void> {
+        await this.update(userId, {
+            last_login_ip: ipAddress || null,
+            last_login_device: userAgent || null
+        });
+    }
+
+    async clearRefreshToken(userId: string): Promise<void> {
+        await this.update(userId, { refresh_token: null });
+    }
+
+    async updateRefreshToken(userId: string, refreshToken: string | null): Promise<void> {
+        await this.update(userId, { refresh_token: refreshToken });
+    }
 }
 
 export const userRepository = new UserRepository();

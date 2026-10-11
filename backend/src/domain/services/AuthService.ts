@@ -4,6 +4,7 @@ import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../classes/Resp
 import { SignUpRequestDTO, LoginRequestDTO, AuthResponseDTO, RefreshRequestDTO } from '../classes/AuthDto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { redisClient } from '../../infrastructure/redis/RedisClient';
 
 export class AuthService {
     
@@ -32,8 +33,10 @@ export class AuthService {
             const accessToken = this.generateAccessToken(newUser.id);
             const refreshToken = this.generateRefreshToken(newUser.id);
 
-            newUser.refresh_token = refreshToken;
-            await userRepository.saveEntity(newUser);
+            // Store transient session token in Redis (7 days TTL)
+            await redisClient.client.setEx(`refresh_token:${newUser.id}`, 7 * 24 * 3600, refreshToken);
+            // Targeted update in Postgres via UserRepository
+            await userRepository.updateRefreshToken(newUser.id, refreshToken);
 
             const data: AuthResponseDTO = {
                 user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating, max_elo_rating: newUser.max_elo_rating, avatar_url: newUser.avatar_url },
@@ -63,10 +66,12 @@ export class AuthService {
             const accessToken = this.generateAccessToken(user.id);
             const refreshToken = this.generateRefreshToken(user.id);
 
-            user.refresh_token = refreshToken;
-            user.last_login_ip = loginRequest.ipAddress || null;
-            user.last_login_device = loginRequest.userAgent || null;
-            await userRepository.saveEntity(user);
+            // 1. Store transient session token in Redis (7-day TTL)
+            await redisClient.client.setEx(`refresh_token:${user.id}`, 7 * 24 * 3600, refreshToken);
+
+            // 2. Persist audit metadata & token in Postgres via UserRepository methods
+            await userRepository.updateLoginMetadata(user.id, loginRequest.ipAddress, loginRequest.userAgent);
+            await userRepository.updateRefreshToken(user.id, refreshToken);
 
             const data: AuthResponseDTO = {
                 user: { id: user.id, email: user.email, username: user.username, elo_rating: user.elo_rating, max_elo_rating: user.max_elo_rating, avatar_url: user.avatar_url },
@@ -85,39 +90,38 @@ export class AuthService {
         try {
             const decoded = jwt.verify(refreshRequest.refreshToken, this.jwtRefreshSecret) as { id: string };
 
-            const user = await userRepository.getUserById(decoded.id);
-            
-            if (!user) {
+            // 1. Check Redis for fast transient session lookup
+            let storedRefreshToken = await redisClient.client.get(`refresh_token:${decoded.id}`);
+
+            // Fallback to PostgreSQL for migration compatibility
+            if (!storedRefreshToken) {
+                const dbUser = await userRepository.getUserById(decoded.id);
+                if (dbUser && dbUser.refresh_token) {
+                    storedRefreshToken = dbUser.refresh_token;
+                }
+            }
+
+            if (!storedRefreshToken) {
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, RESPONSE_MESSAGES.INVALID_TOKEN);
             }
 
             // --- THEFT DETECTION LOGIC ---
-            if (user.refresh_token !== refreshRequest.refreshToken) {
-                console.warn(`[SECURITY ALERT] Token mismatch theft detected for user ID: ${user.id}`);
-                user.refresh_token = null;
-                await userRepository.saveEntity(user);
+            if (storedRefreshToken !== refreshRequest.refreshToken) {
+                console.warn(`[SECURITY ALERT] Token mismatch theft detected for user ID: ${decoded.id}`);
+                await redisClient.client.del(`refresh_token:${decoded.id}`);
+                await userRepository.clearRefreshToken(decoded.id);
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, "Security Alert: Invalid token. Account secured and logged out.");
             }
 
-            // --- FINGERPRINT CHECK LOGIC (Layer 2) ---
-            if (user.last_login_ip !== refreshRequest.ipAddress || user.last_login_device !== refreshRequest.userAgent) {
-                console.warn(`[SECURITY ALERT] Context anomaly detected for user ID: ${user.id}. Old IP: ${user.last_login_ip}, New IP: ${refreshRequest.ipAddress}`);
-                
-                // You might choose to just prompt for password instead of completely wiping the token,
-                // but for maximum security we will wipe it as requested.
-                user.refresh_token = null;
-                await userRepository.saveEntity(user);
-                return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, "Security Alert: Unrecognized device or network. Please log in again.");
-            }
+            const newAccessToken = this.generateAccessToken(decoded.id);
+            const newRefreshToken = this.generateRefreshToken(decoded.id);
 
-            const newAccessToken = this.generateAccessToken(user.id);
-            const newRefreshToken = this.generateRefreshToken(user.id);
+            // Update session token in Redis
+            await redisClient.client.setEx(`refresh_token:${decoded.id}`, 7 * 24 * 3600, newRefreshToken);
 
-            user.refresh_token = newRefreshToken;
-            // Update fingerprint with current request info just in case
-            user.last_login_ip = refreshRequest.ipAddress || null;
-            user.last_login_device = refreshRequest.userAgent || null;
-            await userRepository.saveEntity(user);
+            // Persist updated audit metadata and token in Postgres via UserRepository
+            await userRepository.updateLoginMetadata(decoded.id, refreshRequest.ipAddress, refreshRequest.userAgent);
+            await userRepository.updateRefreshToken(decoded.id, newRefreshToken);
 
             const data = {
                 accessToken: newAccessToken,
@@ -133,11 +137,8 @@ export class AuthService {
 
     public async logout(userId: string): Promise<ResponseData> {
         try {
-            const user = await userRepository.getUserById(userId);
-            if (user) {
-                user.refresh_token = null;
-                await userRepository.saveEntity(user);
-            }
+            await redisClient.client.del(`refresh_token:${userId}`);
+            await userRepository.clearRefreshToken(userId);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS);
         } catch(error: any) {
             console.error(`[AuthService] logout error: ${error.message}`);
