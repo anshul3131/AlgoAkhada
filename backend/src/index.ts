@@ -138,12 +138,13 @@ async function startServer(): Promise<void> {
 
             console.log(`User connected to WebSockets: ${socket.id}`);
 
-            // Frontend tells the server which submission to watch
-            socket.on('subscribeToSubmission', (submissionId: string) => {
-                // Socket.io "rooms" are perfect for this. We put the user in a room named after the ID.
+            // Frontend tells the server which submission to watch (support both camelCase and snake_case)
+            const handleSubmissionSub = (submissionId: string) => {
                 socket.join(submissionId);
                 console.log(`Socket ${socket.id} is listening for submission: ${submissionId}`);
-            });
+            };
+            socket.on('subscribeToSubmission', handleSubmissionSub);
+            socket.on('subscribe_submission', handleSubmissionSub);
 
             socket.on('join_match', (matchId: string) => {
                 const matchRoom = `match:${matchId}`;
