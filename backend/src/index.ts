@@ -97,7 +97,7 @@ async function startServer(): Promise<void> {
 
         // Initialize WebSockets
         const io = new Server(server, {
-            cors: { origin: true, credentials: true } // Properly handles cross-origin credentials
+            cors: { origin: true, credentials: true, maxAge: 86400 } // Properly handles cross-origin credentials
         });
 
         io.use((socket, next) => {
@@ -486,6 +486,7 @@ async function startServer(): Promise<void> {
         });
 
         appEvents.on('match_found', (data) => {
+            console.log(`[WS] Emitting match_found to user:${data.user1Id} and user:${data.user2Id}`, data);
             io.to(`user:${data.user1Id}`).emit('match_found', data);
             io.to(`user:${data.user2Id}`).emit('match_found', data);
         });

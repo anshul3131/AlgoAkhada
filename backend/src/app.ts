@@ -21,7 +21,8 @@ app.use(cookieParser());
 useExpressServer(app, {
     cors: {
         origin: true,
-        credentials: true
+        credentials: true,
+        maxAge: 86400
     },
     controllers: [AuthController, ProblemController, SubmissionController, TestCaseController, RecentMatchController, ExecutionController, CustomMatchController, UserController, DashboardController], // Add other controllers as needed
     // We disable the default error handler to strictly use our custom ResponseBuilder
