@@ -1,4 +1,4 @@
-import logo from '../../../../backend/assets/AlgoAkhada_logo.png';
+const logo = '/AlgoAkhada_logo.png';
 import { Badge } from './Badge';
 
 interface Props {

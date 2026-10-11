@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AuthUser } from '../../lib/api';
-import logo from '../../../../backend/assets/AlgoAkhada_logo.png';
+const logo = '/AlgoAkhada_logo.png';
 
 interface AuthScreenProps {
   onAuthenticated?: (user: AuthUser) => void;
