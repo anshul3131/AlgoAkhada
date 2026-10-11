@@ -67,3 +67,38 @@
   }
   *::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--text-muted)); background-clip: content-box; }
 }
+
+/* Problem Statement styling & Light Mode visibility fix */
+.problem-statement-content {
+  color: rgb(var(--text-primary));
+}
+
+.problem-statement-content h1,
+.problem-statement-content h2,
+.problem-statement-content h3,
+.problem-statement-content h4,
+.problem-statement-content p,
+.problem-statement-content span,
+.problem-statement-content div {
+  color: inherit;
+}
+
+/* Override hardcoded text-white in light mode */
+:root:not(.dark) .problem-statement-content,
+:root:not(.dark) [data-problem-statement] {
+  color: rgb(var(--text-primary)) !important;
+}
+
+:root:not(.dark) .problem-statement-content .text-white,
+:root:not(.dark) [data-problem-statement] .text-white,
+:root:not(.dark) .problem-statement-content [class*="text-white"],
+:root:not(.dark) [data-problem-statement] [class*="text-white"] {
+  color: rgb(var(--text-primary)) !important;
+}
+
+:root:not(.dark) .problem-statement-content span.font-mono {
+  color: rgb(var(--accent)) !important;
+  background-color: rgb(var(--bg-elevated));
+  padding: 1px 4px;
+  border-radius: 4px;
+}

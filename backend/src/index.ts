@@ -11,6 +11,7 @@ import { redisClient } from "./infrastructure/redis/RedisClient";
 import { matchmakerService } from "./domain/services/MatchmakerService";
 import { matchService } from "./domain/services/MatchService";
 import { customMatchService } from "./domain/services/CustomMatchService";
+import { dashboardService } from "./domain/services/DashboardService";
 import { matchRepository } from "./infrastructure/database/repositories/MatchRepository";
 
 import { customMatchRepository } from "./infrastructure/database/repositories/CustomMatchRepository";
@@ -99,6 +100,22 @@ async function startServer(): Promise<void> {
         const io = new Server(server, {
             cors: { origin: true, credentials: true, maxAge: 86400 } // Properly handles cross-origin credentials
         });
+
+        const broadcastPublicLobbies = async () => {
+            const res = await customMatchService.getPublicLobbies();
+            io.emit('public_lobbies_updated', res.data);
+        };
+
+        const broadcastLiveMatches = async () => {
+            try {
+                const res = await dashboardService.getLiveMatches();
+                if (res.responseCode < 400 && res.data) {
+                    io.emit('live_matches_updated', res.data);
+                }
+            } catch (err: any) {
+                console.error("Failed to broadcast live matches:", err.message);
+            }
+        };
 
         io.use((socket, next) => {
             // Because we switched to HttpOnly cookies, the token is now in the 'cookie' header!
@@ -267,10 +284,9 @@ async function startServer(): Promise<void> {
                 socket.emit('queue_status', { status: 'left' });
                 console.log(`User ${userId} left the queue.`);
             });
-            const broadcastPublicLobbies = async () => {
-                const res = await customMatchService.getPublicLobbies();
-                io.emit('public_lobbies_updated', res.data);
-            };
+            socket.on('get_live_matches', () => {
+                broadcastLiveMatches();
+            });
 
             // --- Custom Lobbies ---
             socket.on('custom_lobby_create', async (data: { topic: string, timeLimit: number, maxParticipants: number, name?: string, difficulty?: string, isPublic?: boolean }) => {
@@ -490,6 +506,7 @@ async function startServer(): Promise<void> {
             console.log(`[WS] Emitting match_found to user:${data.user1Id} and user:${data.user2Id}`, data);
             io.to(`user:${data.user1Id}`).emit('match_found', data);
             io.to(`user:${data.user2Id}`).emit('match_found', data);
+            broadcastLiveMatches();
         });
 
         appEvents.on('opponent_status', (data) => {
@@ -498,6 +515,7 @@ async function startServer(): Promise<void> {
 
         appEvents.on('match_result', (data) => {
             io.to(`match:${data.matchId}`).emit('match_result', data);
+            broadcastLiveMatches();
         });
 
         appEvents.on('elo_update', (data) => {

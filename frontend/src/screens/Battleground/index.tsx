@@ -123,7 +123,7 @@ export function Battleground({ userId, matchId, problemId, onFinished, startTime
             <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
             <div>
               <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
-              <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
+              <div data-problem-statement className="problem-statement-content mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
             </div>
             <div className="border-t border-border-hairline pt-4"><p className="mb-3 text-xs uppercase tracking-[0.2em] text-text-secondary">Match brief</p><div className="grid grid-cols-2 gap-2"><ApiStatus label="Time" value={`${problem?.timeLimit ?? 2}s`} /><ApiStatus label="Memory" value={`${problem?.memoryLimit ?? 256}MB`} /></div></div>
           </GlowPanel>

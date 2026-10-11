@@ -16,7 +16,7 @@ export class ProblemFormatter {
         formatted = formatted.replace(/-----Examples-----[^]*?(-----Note-----|$)/gi, '$1');
 
         // 2. Replace known Codeforces markers with styled HTML headers
-        const headerClass = "text-lg font-bold text-white mt-8 mb-3";
+        const headerClass = "text-lg font-bold text-text-primary mt-8 mb-3";
         
         formatted = formatted.replace(/-----Input-----/gi, `\n\n<h3 class="${headerClass}">Input</h3>\n\n`);
         formatted = formatted.replace(/-----Output-----/gi, `\n\n<h3 class="${headerClass}">Output</h3>\n\n`);
@@ -73,9 +73,8 @@ export class ProblemFormatter {
         formatted = formatted.replace(/\^([0-9]+|[a-zA-Z])/g, `<sup style="${supStyle}">$1</sup>`);
 
         // 5. Clean up $ tags and wrap math text to make it stand out
-        // The user specifically requested white color instead of green/gray
-        formatted = formatted.replace(/\$\$(.*?)\$\$/g, '<span class="font-mono text-white">$1</span>');
-        formatted = formatted.replace(/\$(.*?)\$/g, '<span class="font-mono text-white">$1</span>');
+        formatted = formatted.replace(/\$\$(.*?)\$\$/g, '<span class="font-mono text-text-primary">$1</span>');
+        formatted = formatted.replace(/\$(.*?)\$/g, '<span class="font-mono text-text-primary">$1</span>');
 
         // 6. Convert text to HTML paragraphs and line breaks
         // Normalize newlines
@@ -91,7 +90,7 @@ export class ProblemFormatter {
                     return block.trim();
                 }
                 // Otherwise wrap in <p> and convert single newlines to <br/>
-                return `<p class="mb-4 text-white leading-relaxed">${block.trim().replace(/\n/g, '<br/>')}</p>`;
+                return `<p class="mb-4 text-text-primary leading-relaxed">${block.trim().replace(/\n/g, '<br/>')}</p>`;
             })
             .join('\n');
 

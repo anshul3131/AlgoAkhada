@@ -7,6 +7,7 @@ import { matchApi, problemApi, dashboardApi } from '../../lib/api';
 import type { Player, RecentMatchRecord } from '../../types';
 import { CustomLobbyRulesModal } from '../../components/shared/CreateCustomLobbyModal';
 import { PublicLobbiesPanel } from '../../components/shared/PublicLobbiesPanel';
+import { useRealtimeEvent } from '../../providers/RealtimeProvider';
 
 const ChevronStack = ({ up }: { up?: boolean }) => (
   <div className="flex flex-col items-center justify-center -space-y-[3px]">
@@ -137,6 +138,10 @@ export function LobbyDashboard({
       isCancelled = true;
     };
   }, []);
+
+  useRealtimeEvent('live_matches_updated', (updatedMatches: any[]) => {
+    setLiveMatches(updatedMatches);
+  });
 
   return (
     

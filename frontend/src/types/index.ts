@@ -100,6 +100,7 @@ export interface RealtimeEventMap {
   custom_lobby_chat_message: { userId: string; username: string; message: string; timestamp: string };
   custom_lobby_chat_typing: { userId: string; username: string; isTyping: boolean };
   public_lobbies_updated: any[];
+  live_matches_updated: any[];
   webrtc_offer: { senderId: string; offer: RTCSessionDescriptionInit };
   webrtc_answer: { senderId: string; answer: RTCSessionDescriptionInit };
   webrtc_ice_candidate: { senderId: string; candidate: RTCIceCandidateInit };

@@ -202,7 +202,7 @@ export function PracticeScreen({
                   </div>
                 )}
               </h1>
-              <div className="mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the upsolve problem details.' }}></div>
+              <div data-problem-statement className="problem-statement-content mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the upsolve problem details.' }}></div>
             </div>
 
             <div className="border-t border-border-hairline pt-4">
