@@ -2,7 +2,7 @@ import { User } from '../../domain/entities/User';
 import { userRepository } from '../../infrastructure/database/repositories/UserRepository';
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../classes/ResponseDTO';
 import { SignUpRequestDTO, LoginRequestDTO, AuthResponseDTO, RefreshRequestDTO } from '../classes/AuthDto';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 export class AuthService {
