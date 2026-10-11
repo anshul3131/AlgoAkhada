@@ -1,9 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from "typeorm";
 import { User } from "./User";
 import { Problem } from "./Problem";
 import { MatchStatus } from "../enums/MatchStatus";
 
 @Entity("matches")
+@Index("idx_matches_user1_finished", ["user1", "created_at"], { where: `"status" = 'FINISHED'` })
+@Index("idx_matches_user2_finished", ["user2", "created_at"], { where: `"status" = 'FINISHED'` })
 export class Match {
     @PrimaryGeneratedColumn("uuid")
     id: string;

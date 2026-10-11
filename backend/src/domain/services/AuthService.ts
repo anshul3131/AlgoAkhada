@@ -4,7 +4,8 @@ import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../classes/Resp
 import { SignUpRequestDTO, LoginRequestDTO, AuthResponseDTO, RefreshRequestDTO } from '../classes/AuthDto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { redisClient } from '../../infrastructure/redis/RedisClient';
+import { redisCache } from '../../infrastructure/redis/RedisCache';
+import { RedisKeys } from '../../infrastructure/redis/RedisConstants';
 
 export class AuthService {
     
@@ -34,7 +35,7 @@ export class AuthService {
             const refreshToken = this.generateRefreshToken(newUser.id);
 
             // Store transient session token in Redis (7 days TTL)
-            await redisClient.client.setEx(`refresh_token:${newUser.id}`, 7 * 24 * 3600, refreshToken);
+            await redisCache.setEx(RedisKeys.getRefreshTokenKey(newUser.id), 7 * 24 * 3600, refreshToken);
 
             const data: AuthResponseDTO = {
                 user: { id: newUser.id, email: newUser.email, username: newUser.username, elo_rating: newUser.elo_rating, max_elo_rating: newUser.max_elo_rating, avatar_url: newUser.avatar_url },
@@ -65,7 +66,7 @@ export class AuthService {
             const refreshToken = this.generateRefreshToken(user.id);
 
             // 1. Store transient session token in Redis (7-day TTL)
-            await redisClient.client.setEx(`refresh_token:${user.id}`, 7 * 24 * 3600, refreshToken);
+            await redisCache.setEx(RedisKeys.getRefreshTokenKey(user.id), 7 * 24 * 3600, refreshToken);
 
             // 2. Persist audit metadata in Postgres via UserRepository method
             await userRepository.updateLoginMetadata(user.id, loginRequest.ipAddress, loginRequest.userAgent);
@@ -88,7 +89,7 @@ export class AuthService {
             const decoded = jwt.verify(refreshRequest.refreshToken, this.jwtRefreshSecret) as { id: string };
 
             // 1. Check Redis for active session
-            const storedRefreshToken = await redisClient.client.get(`refresh_token:${decoded.id}`);
+            const storedRefreshToken = await redisCache.get<string>(RedisKeys.getRefreshTokenKey(decoded.id));
 
             if (!storedRefreshToken) {
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, RESPONSE_MESSAGES.INVALID_TOKEN);
@@ -97,7 +98,7 @@ export class AuthService {
             // --- THEFT DETECTION LOGIC ---
             if (storedRefreshToken !== refreshRequest.refreshToken) {
                 console.warn(`[SECURITY ALERT] Token mismatch theft detected for user ID: ${decoded.id}`);
-                await redisClient.client.del(`refresh_token:${decoded.id}`);
+                await redisCache.del(RedisKeys.getRefreshTokenKey(decoded.id));
                 return ResponseData.build(RESPONSE_CODES.UNAUTHORISED, "Security Alert: Invalid token. Account secured and logged out.");
             }
 
@@ -105,7 +106,7 @@ export class AuthService {
             const newRefreshToken = this.generateRefreshToken(decoded.id);
 
             // Purely in-memory session rotation in Redis (sub-millisecond, zero Postgres disk I/O)
-            await redisClient.client.setEx(`refresh_token:${decoded.id}`, 7 * 24 * 3600, newRefreshToken);
+            await redisCache.setEx(RedisKeys.getRefreshTokenKey(decoded.id), 7 * 24 * 3600, newRefreshToken);
 
             const data = {
                 accessToken: newAccessToken,
@@ -121,7 +122,7 @@ export class AuthService {
 
     public async logout(userId: string): Promise<ResponseData> {
         try {
-            await redisClient.client.del(`refresh_token:${userId}`);
+            await redisCache.del(RedisKeys.getRefreshTokenKey(userId));
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS);
         } catch(error: any) {
             console.error(`[AuthService] logout error: ${error.message}`);

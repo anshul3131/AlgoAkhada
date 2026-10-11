@@ -1,4 +1,5 @@
-import { redisClient } from "../../infrastructure/redis/RedisClient";
+import { redisCache } from "../../infrastructure/redis/RedisCache";
+import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
 import { kafkaProducerClient } from "../../infrastructure/kafka/KafkaProducerClient";
 import { matchRepository } from "../../infrastructure/database/repositories/MatchRepository";
 import { problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
@@ -26,32 +27,32 @@ export class MatchmakerService {
     public async addToQueue(userId: string, elo: number, tag?: string) {
         const timestamp = Date.now();
         const activeTag = tag || "GENERIC";
-        const queueKey = `${this.QUEUE_PREFIX}${activeTag}`;
+        const queueKey = RedisKeys.getMatchmakingQueueKey(activeTag);
 
-        await redisClient.client.zAdd(queueKey, { score: elo, value: userId });
-        await redisClient.client.hSet("queue_join_time", userId, timestamp.toString());
-        await redisClient.client.hSet("user_active_queue", userId, queueKey);
+        await redisCache.zadd(queueKey, elo, userId);
+        await redisCache.hset(RedisKeys.getQueueJoinTimeKey(), userId, timestamp.toString());
+        await redisCache.hset(RedisKeys.getUserActiveQueueKey(), userId, queueKey);
         console.log(`User ${userId} (Elo: ${elo}) joined the queue [${activeTag}].`);
     }
 
     public async removeFromQueue(userId: string) {
-        const queueKey = await redisClient.client.hGet("user_active_queue", userId);
+        const queueKey = await redisCache.hget(RedisKeys.getUserActiveQueueKey(), userId);
         if (queueKey) {
-            await redisClient.client.zRem(queueKey, userId);
-            await redisClient.client.hDel("user_active_queue", userId);
+            await redisCache.zrem(queueKey, userId);
+            await redisCache.hdel(RedisKeys.getUserActiveQueueKey(), userId);
         }
-        await redisClient.client.hDel("queue_join_time", userId);
+        await redisCache.hdel(RedisKeys.getQueueJoinTimeKey(), userId);
     }
 
     private async processQueues() {
         const now = Date.now();
         
         // Find all active matchmaking queues
-        const queueKeys = await redisClient.client.keys(`${this.QUEUE_PREFIX}*`);
+        const queueKeys = await redisCache.keys(RedisKeys.getMatchmakingQueuePattern());
 
         for (const queueKey of queueKeys) {
             const tag = queueKey.replace(this.QUEUE_PREFIX, "");
-            const usersInQueue = await redisClient.client.zRangeWithScores(queueKey, 0, -1);
+            const usersInQueue = await redisCache.zrangeWithScores(queueKey, 0, -1);
             
             if (usersInQueue.length < 2) continue; // Need at least 2 players in this tag queue
 
@@ -60,7 +61,7 @@ export class MatchmakerService {
             for (const user of usersInQueue) {
                 if (processedUsers.has(user.value)) continue;
 
-                const joinTimeStr = await redisClient.client.hGet("queue_join_time", user.value);
+                const joinTimeStr = await redisCache.hget(RedisKeys.getQueueJoinTimeKey(), user.value);
                 if (!joinTimeStr) continue;
 
                 const joinTime = parseInt(joinTimeStr);
@@ -71,7 +72,7 @@ export class MatchmakerService {
                 const maxElo = user.score + expansion;
 
                 // Find candidates in range, excluding self
-                const candidates = await redisClient.client.zRangeByScoreWithScores(queueKey, minElo, maxElo);
+                const candidates = await redisCache.zrangeByScoreWithScores(queueKey, minElo, maxElo);
                 const validCandidates = candidates.filter(c => c.value !== user.value && !processedUsers.has(c.value));
 
                 if (validCandidates.length > 0 && validCandidates[0]) {

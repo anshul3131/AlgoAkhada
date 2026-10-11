@@ -7,7 +7,8 @@ import { AppDataSource } from "./infrastructure/database/data_source";
 import { kafkaProducerClient } from "./infrastructure/kafka/KafkaProducerClient";
 import { kafkaConsumerClient } from "./infrastructure/kafka/KafkaConsumerClient";
 import { appEvents } from "./utils/EventEmitter";
-import { redisClient } from "./infrastructure/redis/RedisClient";
+import { redisCache } from "./infrastructure/redis/RedisCache";
+import { RedisKeys } from "./infrastructure/redis/RedisConstants";
 import { matchmakerService } from "./domain/services/MatchmakerService";
 import { matchService } from "./domain/services/MatchService";
 import { customMatchService } from "./domain/services/CustomMatchService";
@@ -36,16 +37,17 @@ async function startServer(): Promise<void> {
         const closeConnections = async () => {
             clearTimeout(timeout);
             try {
-                // Safely disconnect Kafka with a timeout guard
+                // Safely disconnect Kafka and Redis with a timeout guard
                 await Promise.race([
                     Promise.all([
                         kafkaProducerClient.gracefulShutdown(),
-                        kafkaConsumerClient.gracefulShutdown()
+                        kafkaConsumerClient.gracefulShutdown(),
+                        redisCache.disconnect()
                     ]),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Kafka disconnect timeout")), 4000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Cleanup disconnect timeout")), 4000))
                 ]);
             } catch (err: any) {
-                console.error("⚠️ Warning during Kafka disconnect:", err.message);
+                console.error("⚠️ Warning during disconnect:", err.message);
             }
 
             console.log("🏁 Cleanup finished. Exiting process.");
@@ -63,7 +65,6 @@ async function startServer(): Promise<void> {
             closeConnections();
         }
         
-        redisClient.disconnect();
         matchmakerService.stopLoop();
     };
 
@@ -85,7 +86,7 @@ async function startServer(): Promise<void> {
         console.log("✅ Kafka Consumer connected successfully.");
 
         // Connect Redis and Start Matchmaker Loop
-        await redisClient.connect();
+        await redisCache.connect();
         console.log("✅ Redis connected successfully.");
         matchmakerService.startLoop();
 
@@ -229,16 +230,16 @@ async function startServer(): Promise<void> {
                 if (!match) return;
 
                 const opponentId = match.user1.id === userId ? match.user2.id : match.user1.id;
-                const rematchKey = `rematch:${data.matchId}`;
-                const existing = await redisClient.client.get(rematchKey);
+                const rematchKey = RedisKeys.getRematchKey(data.matchId);
+                const existing = await redisCache.get(rematchKey);
 
                 if (existing && existing !== userId) {
-                    await redisClient.client.del(rematchKey);
+                    await redisCache.del(rematchKey);
                     
                     const tag = match.problem?.tags?.[0] || 'GENERIC';
                     await matchmakerService.createMatch(userId, opponentId, tag);
                 } else {
-                    await redisClient.client.set(rematchKey, userId, { EX: 60 });
+                    await redisCache.set(rematchKey, userId, { EX: 60 });
                     io.to(`user:${opponentId}`).emit('rematch_requested');
                 }
             });
@@ -249,8 +250,8 @@ async function startServer(): Promise<void> {
                 const match = await matchRepository.findOne({ where: { id: data.matchId }, relations: { user1: true, user2: true } });
                 if (!match) return;
                 const opponentId = match.user1.id === userId ? match.user2.id : match.user1.id;
-                const rematchKey = `rematch:${data.matchId}`;
-                await redisClient.client.del(rematchKey);
+                const rematchKey = RedisKeys.getRematchKey(data.matchId);
+                await redisCache.del(rematchKey);
                 io.to(`user:${opponentId}`).emit('rematch_declined');
             });
 

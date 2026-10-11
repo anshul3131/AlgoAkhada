@@ -28,26 +28,24 @@ export class MatchRepository extends Repository<Match> {
     }
 
     async getUserMatchStats(userId: string): Promise<{ wins: number, losses: number }> {
-        const matches = await this.find({
-            where: [
-                { user1: { id: userId }, status: MatchStatus.FINISHED },
-                { user2: { id: userId }, status: MatchStatus.FINISHED }
-            ],
-            relations: { winner: true }
-        });
+        const result = await this.query(
+            `SELECT 
+                COUNT(CASE WHEN winner_id = $1 THEN 1 END)::int AS wins,
+                COUNT(CASE WHEN winner_id IS NOT NULL AND winner_id != $1 THEN 1 END)::int AS losses
+             FROM matches
+             WHERE (user1_id = $1 OR user2_id = $1)
+               AND status = $2`,
+            [userId, MatchStatus.FINISHED]
+        );
 
-        let wins = 0;
-        let losses = 0;
-
-        for (const match of matches) {
-            if (match.winner && match.winner.id === userId) {
-                wins++;
-            } else if (match.winner && match.winner.id !== userId) {
-                losses++;
-            }
+        if (result && result.length > 0) {
+            return {
+                wins: Number(result[0].wins) || 0,
+                losses: Number(result[0].losses) || 0
+            };
         }
 
-        return { wins, losses };
+        return { wins: 0, losses: 0 };
     }
 }
 

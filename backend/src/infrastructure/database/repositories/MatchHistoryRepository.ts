@@ -1,4 +1,4 @@
-import { Repository, QueryRunner } from "typeorm";
+import { Repository, QueryRunner, In } from "typeorm";
 import { MatchHistory } from "../../../domain/entities/MatchHistory";
 import { AppDataSource } from "../data_source";
 import { SubmissionStatus } from "../../../domain/entities/Submission";
@@ -23,6 +23,18 @@ export class MatchHistoryRepository extends Repository<MatchHistory> {
                 submission: { status: SubmissionStatus.ACCEPTED }
             },
             relations: {submission : true}
+        });
+    }
+
+    async getAcceptedSubmissionsForMatches(matchIds: string[], userId: string): Promise<MatchHistory[]> {
+        if (!matchIds || matchIds.length === 0) return [];
+        return await this.find({
+            where: {
+                match: { id: In(matchIds) },
+                user: { id: userId },
+                submission: { status: SubmissionStatus.ACCEPTED }
+            },
+            relations: { match: true, submission: true }
         });
     }
 }

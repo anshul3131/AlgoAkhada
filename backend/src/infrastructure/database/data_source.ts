@@ -9,9 +9,8 @@ import { MatchHistory } from "../../domain/entities/MatchHistory";
 import { CustomMatch } from "../../domain/entities/CustomMatch";
 import { CustomMatchParticipant } from "../../domain/entities/CustomMatchParticipant";
 
-// Optional: If you test locally outside of K8s, uncomment this to read a local .env file
-// import * as dotenv from "dotenv";
-// dotenv.config();
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const AppDataSource = new DataSource({
     type: "postgres",

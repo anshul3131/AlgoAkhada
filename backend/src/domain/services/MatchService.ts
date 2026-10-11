@@ -1,6 +1,8 @@
 import { kafkaProducerClient } from "../../infrastructure/kafka/KafkaProducerClient";
 import { matchRepository } from "../../infrastructure/database/repositories/MatchRepository";
 import { userRepository } from "../../infrastructure/database/repositories/UserRepository";
+import { redisCache } from "../../infrastructure/redis/RedisCache";
+import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
 import { Match } from "../entities/Match";
 import { MatchStatus } from "../enums/MatchStatus";
 
@@ -47,6 +49,16 @@ export class MatchService {
 
         match.winner = winner;
         await matchRepository.save(match);
+
+        // Invalidate recent matches cache for both players
+        try {
+            await Promise.all([
+                redisCache.del(RedisKeys.getRecentMatchesKey(winnerId)),
+                redisCache.del(RedisKeys.getRecentMatchesKey(loserId))
+            ]);
+        } catch (cacheErr: any) {
+            console.warn(`[MatchService] Failed to invalidate recent matches cache: ${cacheErr.message}`);
+        }
 
 
         // Calculate ELO
