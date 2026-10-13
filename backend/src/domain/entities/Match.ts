@@ -6,6 +6,7 @@ import { MatchStatus } from "../enums/MatchStatus";
 @Entity("matches")
 @Index("idx_matches_user1_finished", ["user1", "created_at"], { where: `"status" = 'FINISHED'` })
 @Index("idx_matches_user2_finished", ["user2", "created_at"], { where: `"status" = 'FINISHED'` })
+@Index("idx_matches_inprogress_created_at", ["created_at"], { where: `"status" = 'IN_PROGRESS'` })
 export class Match {
     @PrimaryGeneratedColumn("uuid")
     id: string;

@@ -27,6 +27,15 @@ export class MatchRepository extends Repository<Match> {
         });
     }
 
+    async getLiveMatches(limit: number = 20): Promise<Match[]> {
+        return await this.find({
+            where: { status: MatchStatus.IN_PROGRESS },
+            relations: { user1: true, user2: true, problem: true },
+            order: { created_at: "DESC" },
+            take: limit
+        });
+    }
+
     async getUserMatchStats(userId: string): Promise<{ wins: number, losses: number }> {
         const result = await this.query(
             `SELECT 

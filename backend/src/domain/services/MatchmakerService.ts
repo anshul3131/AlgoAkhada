@@ -129,6 +129,13 @@ export class MatchmakerService {
 
         await matchRepository.save(match);
 
+        // Invalidate live matches cache so lobby tickers receive updated active matches
+        try {
+            await redisCache.del(RedisKeys.getLiveMatchesKey());
+        } catch (cacheErr: any) {
+            console.warn(`[MatchmakerService] Failed to invalidate live matches cache: ${cacheErr.message}`);
+        }
+
         const matchPayload = {
             type: 'match_found',
             payload: {

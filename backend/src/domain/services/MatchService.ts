@@ -50,14 +50,15 @@ export class MatchService {
         match.winner = winner;
         await matchRepository.save(match);
 
-        // Invalidate recent matches cache for both players
+        // Invalidate recent matches and live matches cache
         try {
             await Promise.all([
                 redisCache.del(RedisKeys.getRecentMatchesKey(winnerId)),
-                redisCache.del(RedisKeys.getRecentMatchesKey(loserId))
+                redisCache.del(RedisKeys.getRecentMatchesKey(loserId)),
+                redisCache.del(RedisKeys.getLiveMatchesKey())
             ]);
         } catch (cacheErr: any) {
-            console.warn(`[MatchService] Failed to invalidate recent matches cache: ${cacheErr.message}`);
+            console.warn(`[MatchService] Failed to invalidate cache: ${cacheErr.message}`);
         }
 
 

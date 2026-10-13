@@ -5,6 +5,10 @@ import { Problem } from "../entities/Problem";
 import { MatchStatus } from "../enums/MatchStatus";
 import { ResponseData } from "../classes/ResponseDTO";
 import { RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
+import { matchRepository } from "../../infrastructure/database/repositories/MatchRepository";
+import { redisCache } from "../../infrastructure/redis/RedisCache";
+import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
+import { LiveMatchDTO } from "../classes/LiveMatchesDTO";
 
 class DashboardService {
     public async getDashboardStats(userId: string): Promise<ResponseData> {
@@ -143,16 +147,20 @@ class DashboardService {
     }
     public async getLiveMatches(): Promise<ResponseData> {
         try {
-            const matchRepo = AppDataSource.getRepository(Match);
-            const liveMatches = await matchRepo.find({
-                where: { status: MatchStatus.IN_PROGRESS },
-                relations: { user1: true, user2: true, problem: true },
-                order: { created_at: "DESC" },
-                take: 20
-            });
+            const cacheKey = RedisKeys.getLiveMatchesKey();
+            try {
+                const cached = await redisCache.get<LiveMatchDTO[]>(cacheKey);
+                if (cached) {
+                    return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
+                }
+            } catch (cacheErr: any) {
+                console.warn(`[DashboardService] Redis get live matches failed, falling back to DB: ${cacheErr.message}`);
+            }
+
+            const liveMatches = await matchRepository.getLiveMatches(20);
 
             // Map to a clean DTO
-            const data = liveMatches.map(m => ({
+            const data: LiveMatchDTO[] = liveMatches.map(m => ({
                 matchId: m.id,
                 user1: { id: m.user1?.id, username: m.user1?.username, elo: m.user1?.elo_rating },
                 user2: { id: m.user2?.id, username: m.user2?.username, elo: m.user2?.elo_rating },
@@ -163,6 +171,12 @@ class DashboardService {
 
             // Sort by combined elo rating
             data.sort((a, b) => ((b.user1.elo || 1200) + (b.user2.elo || 1200)) - ((a.user1.elo || 1200) + (a.user2.elo || 1200)));
+
+            try {
+                await redisCache.set(cacheKey, data, { EX: 60 });
+            } catch (cacheErr: any) {
+                console.warn(`[DashboardService] Redis set live matches failed: ${cacheErr.message}`);
+            }
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {

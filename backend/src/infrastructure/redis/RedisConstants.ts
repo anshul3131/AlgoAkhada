@@ -51,4 +51,12 @@ export class RedisKeys {
     public static getRematchKey(matchId: string): string {
         return `rematch:${matchId}`;
     }
+
+    /**
+     * Key for cached live in-progress matches displayed on lobby arena
+     * Example: live_matches
+     */
+    public static getLiveMatchesKey(): string {
+        return `live_matches`;
+    }
 }
