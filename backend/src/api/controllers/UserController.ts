@@ -7,10 +7,11 @@
 
 import { Response } from 'express';
 import { JsonController, Get, QueryParam, Res, Authorized } from "routing-controllers";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { UserService } from '../../domain/services/UserService';
 import { ResponseBuilder } from '../../utils/ResponseBuilder';
 
+@Service()
 @JsonController("/api/users")
 export class UserController {
     private userService: UserService;

@@ -7,10 +7,11 @@
 
 import { JsonController, Get, Req, Res, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { DashboardService } from "../../domain/services/DashboardService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 
+@Service()
 @JsonController("/api/dashboard")
 export class DashboardController {
     private dashboardService: DashboardService;

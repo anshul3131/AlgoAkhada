@@ -7,7 +7,7 @@
 
 import { JsonController, Post, Body, Res, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { TestCaseService } from "../../domain/services/TestCaseService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import { UploadTestCasesDTO } from "../../domain/classes/UploadTestCasesDTO";
@@ -16,6 +16,7 @@ import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
 
 const ACCEPTED_HTTP_STATUS = 202;
 
+@Service()
 @JsonController("/api/testcases")
 @Authorized()
 export class TestCaseController {

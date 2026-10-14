@@ -7,7 +7,7 @@
 
 import { Response } from 'express';
 import { JsonController, Post, Body, Res, Req, Authorized, Get } from "routing-controllers";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { AuthService } from '../../domain/services/AuthService';
 import { UserService } from '../../domain/services/UserService';
 import { SignUpRequestDTO, LoginRequestDTO } from '../../domain/classes/AuthDto';
@@ -15,6 +15,7 @@ import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/cl
 import { ResponseBuilder } from '../../utils/ResponseBuilder';
 import { COOKIE_NAMES, ACCESS_TOKEN_COOKIE_MAX_AGE_MS, REFRESH_TOKEN_COOKIE_MAX_AGE_MS } from '../../constants/AuthConstants';
 
+@Service()
 @JsonController("/api/users")
 export class AuthController {
     private authService: AuthService;

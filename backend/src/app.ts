@@ -23,8 +23,8 @@ import { ErrorLoggingUtils } from "./utils/ErrorLoggingUtils";
 import { COOKIE_NAMES } from "./constants/AuthConstants";
 import { _DAY_MS, _SECOND_MS } from "./constants/AppConstant";
 
-// Instruct routing-controllers to use TypeDI container
-useContainer(Container);
+// Instruct routing-controllers to use TypeDI container with fallback support
+useContainer(Container, { fallback: true, fallbackOnErrors: true });
 
 // Initialize the Express Application
 const app: Application = express();

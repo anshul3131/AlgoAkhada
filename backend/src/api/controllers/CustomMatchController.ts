@@ -7,11 +7,12 @@
 
 import { Response } from 'express';
 import { JsonController, Get, Param, Res, Authorized } from "routing-controllers";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { CustomMatchService } from '../../domain/services/CustomMatchService';
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/classes/ResponseDTO';
 import { ResponseBuilder } from '../../utils/ResponseBuilder';
 
+@Service()
 @JsonController("/api/custom-matches")
 export class CustomMatchController {
     private customMatchService: CustomMatchService;

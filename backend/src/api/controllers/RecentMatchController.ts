@@ -7,11 +7,12 @@
 
 import { JsonController, Get, QueryParam, Res, Authorized, Req } from "routing-controllers";
 import { Response } from "express";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { RecentMatchService } from "../../domain/services/RecentMatchService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import { DEFAULT_RECENT_MATCHES_LIMIT } from "../../constants/AppConstant";
 
+@Service()
 @JsonController("/api/matches")
 @Authorized()
 export class RecentMatchController {

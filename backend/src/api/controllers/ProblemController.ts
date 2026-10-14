@@ -7,12 +7,13 @@
 
 import { JsonController, Post, Get, Body, Param, QueryParam, Res, Req, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { ProblemService } from "../../domain/services/ProblemService";
 import { CreateProblemDTO } from "../../domain/classes/CreateProblemDTO";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../../domain/classes/ResponseDTO";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 
+@Service()
 @JsonController("/api/problems")
 @Authorized()
 export class ProblemController {

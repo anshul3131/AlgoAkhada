@@ -7,12 +7,13 @@
 
 import { JsonController, Post, Get, Body, Res } from "routing-controllers";
 import { Response } from "express";
-import { Container } from "typedi";
+import { Container, Service } from "typedi";
 import { ExecutionService } from "../../domain/services/ExecutionService";
 import { ExecuteCodeRequestDTO } from "../../domain/classes/ExecutionDTO";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../../domain/classes/ResponseDTO";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 
+@Service()
 @JsonController("/api")
 export class ExecutionController {
     private executionService: ExecutionService;
