@@ -94,10 +94,10 @@ export class CustomMatchService {
 
         try {
             // Pessimistic write lock prevents concurrent over-filling and races with leaveLobby
+            // Must NOT include relations here because PostgreSQL disallows FOR UPDATE on nullable sides of outer joins
             const match = await queryRunner.manager.findOne(CustomMatch, {
                 where: { id: matchId },
-                lock: { mode: "pessimistic_write" },
-                relations: { host: true, problem: true }
+                lock: { mode: "pessimistic_write" }
             });
 
             if (!match) {
@@ -180,16 +180,22 @@ export class CustomMatchService {
 
         try {
             // Pessimistic write lock prevents concurrent joins during room teardown
+            // Lock custom_matches row directly without outer join relations (avoids Postgres outer join FOR UPDATE error)
             const match = await queryRunner.manager.findOne(CustomMatch, {
                 where: { id: matchId },
-                lock: { mode: "pessimistic_write" },
-                relations: { host: true, problem: true }
+                lock: { mode: "pessimistic_write" }
             });
 
             if (!match) {
                 await queryRunner.rollbackTransaction();
                 return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
             }
+
+            // Fetch host relation separately under the lock protection without FOR UPDATE
+            const fullMatch = await queryRunner.manager.findOne(CustomMatch, {
+                where: { id: matchId },
+                relations: { host: true }
+            });
 
             const participants = await queryRunner.manager.find(CustomMatchParticipant, {
                 where: { customMatch: { id: matchId } },
@@ -204,9 +210,9 @@ export class CustomMatchService {
             const remainingParticipants = participants.filter(p => p.user.id !== userId);
 
             let isAborted = false;
-            if (match.host?.id === userId && remainingParticipants.length > 0) {
-                match.host = remainingParticipants[0]!.user;
-                await queryRunner.manager.save(match);
+            if (fullMatch?.host?.id === userId && remainingParticipants.length > 0) {
+                fullMatch.host = remainingParticipants[0]!.user;
+                await queryRunner.manager.save(fullMatch);
             } else if (remainingParticipants.length === 0) {
                 match.status = MatchStatus.ABORTED;
                 await queryRunner.manager.save(match);
