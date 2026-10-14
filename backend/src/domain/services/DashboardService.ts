@@ -9,6 +9,10 @@ import { matchRepository } from "../../infrastructure/database/repositories/Matc
 import { redisCache } from "../../infrastructure/redis/RedisCache";
 import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
 import { LiveMatchDTO } from "../classes/LiveMatchesDTO";
+import { HomeScreenDTO } from "../classes/HomeScreenDTO";
+import { recentMatchService } from "./RecentMatchService";
+import { problemService } from "./ProblemService";
+import { customMatchService } from "./CustomMatchService";
 
 class DashboardService {
     public async getDashboardStats(userId: string): Promise<ResponseData> {
@@ -181,6 +185,31 @@ class DashboardService {
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {
             console.error(`[DashboardService] getLiveMatches error: ${error.message}`);
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    public async getHomeScreenData(userId: string): Promise<ResponseData> {
+        try {
+            const [recentMatchesRes, userStatsRes, tagsRes, liveMatchesRes, publicLobbiesRes] = await Promise.all([
+                recentMatchService.getRecentMatches(userId, 5),
+                recentMatchService.getUserStats(userId),
+                problemService.getTags(),
+                this.getLiveMatches(),
+                customMatchService.getPublicLobbies()
+            ]);
+
+            const homeData: HomeScreenDTO = {
+                recentMatches: (recentMatchesRes.data as any) || [],
+                stats: (userStatsRes.data as any) || { wins: 0, losses: 0 },
+                tags: (tagsRes.data as any)?.tags || [],
+                liveMatches: (liveMatchesRes.data as any) || [],
+                publicLobbies: (publicLobbiesRes.data as any) || []
+            };
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, homeData);
+        } catch (error: any) {
+            console.error(`[DashboardService] getHomeScreenData error: ${error.message}`);
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }

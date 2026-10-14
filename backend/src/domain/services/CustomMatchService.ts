@@ -304,7 +304,7 @@ export class CustomMatchService {
             const payloads = await customMatchRepository.getPublicLobbies();
 
             try {
-                await redisCache.set(cacheKey, payloads, { EX: 10 });
+                await redisCache.set(cacheKey, payloads, { EX: 60 });
             } catch (cacheErr: any) {
                 console.warn(`[CustomMatchService] Redis set public lobbies failed: ${cacheErr.message}`);
             }

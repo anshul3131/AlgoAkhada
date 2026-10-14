@@ -31,4 +31,19 @@ export class DashboardController {
             return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
         }
     }
+
+    @Get("/home-screen")
+    @Authorized()
+    async getHomeScreen(
+        @Req() req: any,
+        @Res() res: Response
+    ) {
+        const userId = req.user.id;
+        const serviceResponse = await dashboardService.getHomeScreenData(userId);
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
+            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
+        } else {
+            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
+        }
+    }
 }

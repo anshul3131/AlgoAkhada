@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { GlowPanel } from './GlowPanel';
 import { Badge } from './Badge';
 import { customMatchApi } from '../../lib/api';
@@ -7,16 +7,38 @@ import { useRealtimeEvent } from '../../providers/RealtimeProvider';
 interface PublicLobbiesPanelProps {
   onJoinCode: (code: string) => void;
   className?: string;
+  initialLobbies?: any[];
+  isLoading?: boolean;
 }
 
-export function PublicLobbiesPanel({ onJoinCode, className = "" }: PublicLobbiesPanelProps) {
-  const [lobbies, setLobbies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export function PublicLobbiesPanel({ 
+  onJoinCode, 
+  className = "", 
+  initialLobbies, 
+  isLoading 
+}: PublicLobbiesPanelProps) {
+  const [lobbies, setLobbies] = useState<any[]>(initialLobbies || []);
+  const [loading, setLoading] = useState(isLoading !== undefined ? isLoading : initialLobbies === undefined);
+  const hasRealtimeUpdate = useRef(false);
+
+  useEffect(() => {
+    if (initialLobbies !== undefined && !hasRealtimeUpdate.current) {
+      setLobbies(initialLobbies);
+    }
+  }, [initialLobbies]);
+
+  useEffect(() => {
+    if (isLoading !== undefined) {
+      setLoading(isLoading);
+    }
+  }, [isLoading]);
 
   const fetchLobbies = async () => {
     try {
       const data = await customMatchApi.getPublicLobbies();
-      setLobbies(data || []);
+      if (!hasRealtimeUpdate.current) {
+        setLobbies(data || []);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -25,15 +47,18 @@ export function PublicLobbiesPanel({ onJoinCode, className = "" }: PublicLobbies
   };
 
   useRealtimeEvent('public_lobbies_updated', (payload) => {
+    hasRealtimeUpdate.current = true;
     if (Array.isArray(payload)) setLobbies(payload);
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-    fetchLobbies();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
+    if (initialLobbies === undefined) {
+      const timer = setTimeout(() => {
+        fetchLobbies();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [initialLobbies]);
 
   return (
     <GlowPanel className={`flex min-h-0 flex-col gap-4 overflow-hidden ${className}`}>

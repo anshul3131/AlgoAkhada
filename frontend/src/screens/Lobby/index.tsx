@@ -98,6 +98,8 @@ export function LobbyDashboard({
   };
 
   const [stats, setStats] = useState<{wins: number, losses: number}>({wins: 0, losses: 0});
+  const [publicLobbies, setPublicLobbies] = useState<any[] | undefined>(undefined);
+  const hasLiveRealtime = useRef(false);
 
   useEffect(() => {
     let isCancelled = false;
@@ -108,17 +110,15 @@ export function LobbyDashboard({
       setError(null);
 
       try {
-        const [matches, userStats, tagsData, liveData] = await Promise.all([
-          matchApi.getRecentMatches(5),
-          matchApi.getUserStats(),
-          problemApi.getTags(),
-          dashboardApi.getLiveMatches()
-        ]);
+        const homeData = await dashboardApi.getHomeScreen();
         if (!isCancelled) {
-          setRecentMatches(matches);
-          setStats(userStats);
-          setTags(tagsData.tags);
-          setLiveMatches(liveData);
+          setRecentMatches(homeData.recentMatches || []);
+          setStats(homeData.stats || { wins: 0, losses: 0 });
+          setTags(homeData.tags || []);
+          if (!hasLiveRealtime.current) {
+            setLiveMatches(homeData.liveMatches || []);
+          }
+          setPublicLobbies(homeData.publicLobbies || []);
         }
       } catch (caughtError) {
         if (!isCancelled) {
@@ -140,6 +140,7 @@ export function LobbyDashboard({
   }, []);
 
   useRealtimeEvent('live_matches_updated', (updatedMatches: any[]) => {
+    hasLiveRealtime.current = true;
     setLiveMatches(updatedMatches);
   });
 
@@ -180,7 +181,12 @@ export function LobbyDashboard({
         </GlowPanel>
 
         {/* 2. PUBLIC LOBBIES */}
-        <PublicLobbiesPanel className="max-lg:h-[360px] lg:col-span-4 lg:row-start-2" onJoinCode={onJoinByCode} />
+        <PublicLobbiesPanel 
+          className="max-lg:h-[360px] lg:col-span-4 lg:row-start-2" 
+          onJoinCode={onJoinByCode} 
+          initialLobbies={publicLobbies}
+          isLoading={isLoadingMatches}
+        />
 
         {/* 3. LIVE MATCHES */}
         <GlowPanel className="max-lg:h-[360px] lg:col-span-4 lg:col-start-5 lg:row-start-2 flex min-h-0 flex-col p-3">

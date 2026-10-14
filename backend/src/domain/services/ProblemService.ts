@@ -9,6 +9,8 @@ import { ProblemTag } from "../enums/ProblemTag";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
 import { ProblemDetailDTO, ProblemListResponseDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
 import { ProblemFormatter } from "../../utils/ProblemFormatter";
+import { redisCache } from "../../infrastructure/redis/RedisCache";
+import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
 
 export class ProblemService {
     
@@ -31,7 +33,24 @@ export class ProblemService {
 
     async getTags(): Promise<ResponseData> {
         try {
+            const cacheKey = RedisKeys.getProblemTagsKey();
+            try {
+                const cached = await redisCache.get<TagsResponseDTO>(cacheKey);
+                if (cached) {
+                    return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
+                }
+            } catch (cacheErr: any) {
+                console.warn(`[ProblemService] Redis get tags failed: ${cacheErr.message}`);
+            }
+
             const data: TagsResponseDTO = { tags: Object.values(ProblemTag) };
+
+            try {
+                await redisCache.set(cacheKey, data, { EX: 3600 });
+            } catch (cacheErr: any) {
+                console.warn(`[ProblemService] Redis set tags failed: ${cacheErr.message}`);
+            }
+
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {
             console.error(`[ProblemService] getTags error: ${error.message}`);

@@ -75,4 +75,12 @@ export class RedisKeys {
     public static getCustomLobbyKey(matchId: string): string {
         return `custom_lobby:${matchId}`;
     }
+
+    /**
+     * Key for cached problem tags list
+     * Example: problem_tags
+     */
+    public static getProblemTagsKey(): string {
+        return `problem_tags`;
+    }
 }

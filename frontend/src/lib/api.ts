@@ -283,7 +283,16 @@ export interface DashboardStats {
   };
 }
 
+export interface HomeScreenData {
+  recentMatches: RecentMatchRecord[];
+  stats: { wins: number; losses: number };
+  tags: string[];
+  liveMatches: any[];
+  publicLobbies: any[];
+}
+
 export const dashboardApi = {
   getStats: () => request<DashboardStats>('/dashboard', { method: 'GET' }),
   getLiveMatches: () => request<any[]>('/dashboard/live', { method: 'GET' }),
+  getHomeScreen: () => request<HomeScreenData>('/dashboard/home-screen', { method: 'GET' }),
 };
