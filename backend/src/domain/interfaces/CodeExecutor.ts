@@ -1,14 +1,21 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Abstract CodeExecutor foundation handling batch container execution, timeout limits, and grading
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import path from "path";
 import { SubmissionStatus } from "../entities/Submission";
-import { promises as fs } from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { promises as fs } from "fs";
+import { v4 as uuidv4 } from "uuid";
 import { TestCase } from "../entities/TestCase";
-
+import { logger } from "../../utils/LogglyClient";
 
 export interface TestCaseExecutionResult {
     testCaseId: string;
     input: string;
-    status: SubmissionStatus | 'SUCCESS';
+    status: SubmissionStatus | "SUCCESS";
     output: string;
     expectedOutput: string;
     executionTimeMs: number;
@@ -24,7 +31,6 @@ export interface ExecutionResult {
     compileError?: string;
 }
 
-
 export abstract class CodeExecutor {
     protected tempDir: string;
     protected abstract fileExtension: string;
@@ -33,7 +39,7 @@ export abstract class CodeExecutor {
     constructor() {
         // Use process.cwd() so it maps to the backend root directory.
         // This makes it easy to mount the directory into a Docker container.
-        this.tempDir = path.join(process.cwd(), 'temp_executions');
+        this.tempDir = path.join(process.cwd(), "temp_executions");
     }
 
     public async execute(code: string, testCases: TestCase[], timeLimit = 2, isRunMode = false): Promise<ExecutionResult> {
@@ -53,7 +59,7 @@ export abstract class CodeExecutor {
             // 2. Compile Natively
             const compileResult = await this.compileNative(sourceFile, executable, jobFolder);
             if (!compileResult.success) {
-                console.error("🚨 Native Compilation Error:", compileResult.error);
+                logger.error(`🚨 Native Compilation Error: ${compileResult.error}`);
                 return { status: SubmissionStatus.COMPILATION_ERROR, passed: 0, total: testCases.length, testCaseResults: [], compileError: compileResult.error || "" };
             }
 
@@ -62,7 +68,7 @@ export abstract class CodeExecutor {
                 const tc = testCases[i];
                 if (!tc) continue;
                 const inputFilePath = path.join(jobFolder, `input_${i}.txt`);
-                await fs.writeFile(inputFilePath, tc.input.trim() + '\n');
+                await fs.writeFile(inputFilePath, tc.input.trim() + "\n");
             }
 
             const runnerScript = `#!/bin/bash
@@ -90,8 +96,8 @@ for ((i=0; i<TEST_COUNT; i++)); do
     fi
 done
 `;
-            await fs.writeFile(path.join(jobFolder, 'runner.sh'), runnerScript);
-            await fs.chmod(path.join(jobFolder, 'runner.sh'), 0o777);
+            await fs.writeFile(path.join(jobFolder, "runner.sh"), runnerScript);
+            await fs.chmod(path.join(jobFolder, "runner.sh"), 0o777);
 
             // 4. Run the batch script (1 single docker exec overhead!)
             await this.runBatch(executable, jobFolder, testCases.length, globalTimeLimitMs);
@@ -110,10 +116,10 @@ done
                 let execTime = 0;
 
                 try {
-                    output = await fs.readFile(path.join(jobFolder, `output_${i}.txt`), 'utf8');
-                    stderrData = await fs.readFile(path.join(jobFolder, `stderr_${i}.txt`), 'utf8');
-                    const statusStr = await fs.readFile(path.join(jobFolder, `status_${i}.txt`), 'utf8');
-                    const parts = statusStr.trim().split(',');
+                    output = await fs.readFile(path.join(jobFolder, `output_${i}.txt`), "utf8");
+                    stderrData = await fs.readFile(path.join(jobFolder, `stderr_${i}.txt`), "utf8");
+                    const statusStr = await fs.readFile(path.join(jobFolder, `status_${i}.txt`), "utf8");
+                    const parts = statusStr.trim().split(",");
                     exitCode = parseInt(parts[0] || "-1", 10);
                     execTime = parseInt(parts[1] || "0", 10);
                 } catch (e) {
@@ -160,7 +166,7 @@ done
 
             let finalStatus = SubmissionStatus.ACCEPTED;
             if (isRunMode && passedCount < testCases.length) {
-                const firstFailed = testCaseResults.find(r => r.status !== SubmissionStatus.SUCCESS && r.status !== 'Accepted');
+                const firstFailed = testCaseResults.find(r => r.status !== SubmissionStatus.SUCCESS && r.status !== "Accepted");
                 finalStatus = firstFailed ? firstFailed.status as SubmissionStatus : SubmissionStatus.WRONG_ANSWER;
             }
 
@@ -176,4 +182,3 @@ done
 
     protected abstract runBatch(executablePath: string, jobFolder: string, testCount: number, globalTimeLimitMs: number): Promise<void>;
 }
-

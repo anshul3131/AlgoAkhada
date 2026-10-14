@@ -1,28 +1,39 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for custom lobby discovery and details retrieval
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Response } from 'express';
 import { JsonController, Get, Param, Res, Authorized } from "routing-controllers";
-import { customMatchService } from '../../domain/services/CustomMatchService';
+import { Container } from "typedi";
+import { CustomMatchService } from '../../domain/services/CustomMatchService';
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/classes/ResponseDTO';
+import { ResponseBuilder } from '../../utils/ResponseBuilder';
 
 @JsonController("/api/custom-matches")
 export class CustomMatchController {
+    private customMatchService: CustomMatchService;
+
+    constructor() {
+        this.customMatchService = Container.get(CustomMatchService);
+    }
 
     @Authorized()
     @Get('/public')
     public async getPublicLobbies(@Res() res: Response) {
-        const response = await customMatchService.getPublicLobbies();
-        res.status(response.responseCode).send({ success: response.responseCode < 400, data: response.data });
-        return res;
+        const response = await this.customMatchService.getPublicLobbies();
+        return ResponseBuilder.send(res, response);
     }
 
     @Authorized()
     @Get('/:id')
     public async getMatch(@Param("id") id: string, @Res() res: Response) {
-        const dto = await customMatchService.getLobbyDTO(id);
+        const dto = await this.customMatchService.getLobbyDTO(id);
         if (!dto) {
-            res.status(RESPONSE_CODES.NOT_FOUND).send({ success: false, data: RESPONSE_MESSAGES.LOBBY_NOT_FOUND });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND));
         }
-        res.status(RESPONSE_CODES.SUCCESS_HTTP_CODE).send({ success: true, data: dto });
-        return res;
+        return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, dto));
     }
 }

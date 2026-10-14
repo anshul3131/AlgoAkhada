@@ -1,7 +1,16 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for code Submission entity lifecycle and lookup queries
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { Submission, SubmissionStatus } from "../../../domain/entities/Submission";
 import { AppDataSource } from "../data_source";
 
+@Service()
 export class SubmissionRepository extends Repository<Submission> {
     constructor() {
         super(Submission, AppDataSource.createEntityManager());

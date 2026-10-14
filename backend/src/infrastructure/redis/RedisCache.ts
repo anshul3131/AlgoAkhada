@@ -1,4 +1,12 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Centralized Redis cache client with namespacing, reconnect resilience, and typed read-through caching
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { createClient } from "redis";
+import { logger } from "../../utils/LogglyClient";
 
 export type RedisClientType = ReturnType<typeof createClient>;
 
@@ -13,7 +21,7 @@ export class RedisCache {
         const url = process.env.REDIS_URL || "redis://localhost:6379";
         this.client = createClient({ url });
 
-        this.client.on("error", (err) => console.error("[RedisCache Error]", err));
+        this.client.on("error", (err) => logger.error(`[RedisCache Error]: ${err?.message || err}`));
     }
 
     public static getInstanceSync(): RedisCache {
@@ -43,7 +51,7 @@ export class RedisCache {
 
         try {
             await Promise.race([connectionPromise, timeoutPromise]);
-            console.log("✅ RedisCache connected successfully.");
+            logger.info("✅ RedisCache connected successfully.");
         } finally {
             if (timeoutId) clearTimeout(timeoutId);
         }
@@ -52,7 +60,7 @@ export class RedisCache {
     public async disconnect(): Promise<void> {
         if (this.client.isOpen) {
             await this.client.disconnect();
-            console.log("✅ RedisCache disconnected.");
+            logger.info("✅ RedisCache disconnected.");
         }
     }
 

@@ -1,8 +1,17 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for 1v1 Match entity records, stats, and active matches
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { Match } from "../../../domain/entities/Match";
 import { AppDataSource } from "../data_source";
 import { MatchStatus } from "../../../domain/enums/MatchStatus";
 
+@Service()
 export class MatchRepository extends Repository<Match> {
     constructor() {
         super(Match, AppDataSource.createEntityManager());
@@ -21,7 +30,7 @@ export class MatchRepository extends Repository<Match> {
                 { user1: { id: userId }, status: MatchStatus.FINISHED },
                 { user2: { id: userId }, status: MatchStatus.FINISHED }
             ],
-            relations: {user1 : true,user2 : true,problem : true,winner : true},
+            relations: { user1: true, user2: true, problem: true, winner: true },
             order: { created_at: "DESC" },
             take: limit
         });

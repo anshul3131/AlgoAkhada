@@ -1,96 +1,122 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for authentication, login/signup, session rotation, and user profile resolution
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Response } from 'express';
-import { authService } from '../../domain/services/AuthService';
 import { JsonController, Post, Body, Res, Req, Authorized, Get } from "routing-controllers";
-import { userRepository } from '../../infrastructure/database/repositories/UserRepository';
-import { SignUpRequestDTO, LoginRequestDTO, RefreshRequestDTO } from '../../domain/classes/AuthDto';
-import { RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/classes/ResponseDTO';
+import { Container } from "typedi";
+import { AuthService } from '../../domain/services/AuthService';
+import { UserService } from '../../domain/services/UserService';
+import { SignUpRequestDTO, LoginRequestDTO } from '../../domain/classes/AuthDto';
+import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from '../../domain/classes/ResponseDTO';
+import { ResponseBuilder } from '../../utils/ResponseBuilder';
+import { COOKIE_NAMES, ACCESS_TOKEN_COOKIE_MAX_AGE_MS, REFRESH_TOKEN_COOKIE_MAX_AGE_MS } from '../../constants/AuthConstants';
 
 @JsonController("/api/users")
 export class AuthController {
+    private authService: AuthService;
+    private userService: UserService;
+
+    constructor() {
+        this.authService = Container.get(AuthService);
+        this.userService = Container.get(UserService);
+    }
 
     @Post('/signup')
     public async signUp(@Req() req: any, @Body() body: SignUpRequestDTO, @Res() res: Response) {
         if (!body.email || !body.password || !body.username) {
-            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
         }
 
-        body.ipAddress = req.ip || req.connection.remoteAddress;
-        body.userAgent = req.headers['user-agent'];
+        body.ipAddress = req.ip || req.connection?.remoteAddress;
+        body.userAgent = req.headers?.['user-agent'];
 
-        const serviceResponse = await authService.signUp(body);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
-            return res.status(statusCode).send({ success: false, data: serviceResponse.responseMessage });
+        const serviceResponse = await this.authService.signUp(body);
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE && serviceResponse.data) {
+            res.cookie(COOKIE_NAMES.ACCESS_TOKEN, serviceResponse.data.accessToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS 
+            });
+            res.cookie(COOKIE_NAMES.REFRESH_TOKEN, serviceResponse.data.refreshToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS 
+            });
         }
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Post('/login')
     public async login(@Req() req: any, @Body() body: LoginRequestDTO, @Res() res: Response) {
         if (!body.email || !body.password) {
-            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
         }
 
-        body.ipAddress = req.ip || req.connection.remoteAddress;
-        body.userAgent = req.headers['user-agent'];
+        body.ipAddress = req.ip || req.connection?.remoteAddress;
+        body.userAgent = req.headers?.['user-agent'];
 
-        const serviceResponse = await authService.login(body);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
-            return res.status(statusCode).send({ success: false, data: serviceResponse.responseMessage });
+        const serviceResponse = await this.authService.login(body);
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE && serviceResponse.data) {
+            res.cookie(COOKIE_NAMES.ACCESS_TOKEN, serviceResponse.data.accessToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS 
+            });
+            res.cookie(COOKIE_NAMES.REFRESH_TOKEN, serviceResponse.data.refreshToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS 
+            });
         }
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Post('/refresh')
     public async refresh(@Req() req: any, @Res() res: Response) {
-        // Read refresh token from cookie or body
-        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+        const refreshToken = req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN] || req.body?.refreshToken;
         if (!refreshToken) {
-            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
         }
 
-        const ipAddress = req.ip || req.connection.remoteAddress;
-        const userAgent = req.headers['user-agent'];
+        const ipAddress = req.ip || req.connection?.remoteAddress;
+        const userAgent = req.headers?.['user-agent'];
 
-        const serviceResponse = await authService.refreshAccessToken({ refreshToken, ipAddress, userAgent });
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.cookie('accessToken', serviceResponse.data.accessToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 15 * 60 * 1000 });
-            res.cookie('refreshToken', serviceResponse.data.refreshToken, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
-            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-            return res;
-        } else {
-            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: serviceResponse.responseMessage });
-            return res;
+        const serviceResponse = await this.authService.refreshAccessToken({ refreshToken, ipAddress, userAgent });
+        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE && serviceResponse.data) {
+            res.cookie(COOKIE_NAMES.ACCESS_TOKEN, serviceResponse.data.accessToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS 
+            });
+            res.cookie(COOKIE_NAMES.REFRESH_TOKEN, serviceResponse.data.refreshToken, { 
+                httpOnly: true, 
+                secure: true, 
+                sameSite: 'none', 
+                maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS 
+            });
         }
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Post('/logout')
     @Authorized()
     public async logout(@Req() req: any, @Res() res: Response) {
-        const userId = req.user.id;
-        const serviceResponse = await authService.logout(userId);
+        const userId = req.user?.id;
+        const serviceResponse = await this.authService.logout(userId);
         
-        // Clear cookies
-        res.clearCookie('accessToken', { secure: true, sameSite: 'none' });
-        res.clearCookie('refreshToken', { secure: true, sameSite: 'none' });
+        res.clearCookie(COOKIE_NAMES.ACCESS_TOKEN, { secure: true, sameSite: 'none' });
+        res.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, { secure: true, sameSite: 'none' });
         
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-            return res;
-        } else {
-            res.status(RESPONSE_CODES.FAILURE).send({ success: false, data: serviceResponse.responseMessage });
-            return res;
-        }
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get('/me')
@@ -98,46 +124,20 @@ export class AuthController {
     public async me(@Req() req: any, @Res() res: Response) {
         const userId = req.user?.id;
         if (!userId) {
-            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.UNAUTHORIZED });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.UNAUTHORISED, RESPONSE_MESSAGES.UNAUTHORIZED));
         }
 
-        const user = await userRepository.getUserById(userId);
-        if (!user) {
-            res.status(RESPONSE_CODES.UNAUTHORISED).send({ success: false, data: RESPONSE_MESSAGES.USER_NOT_FOUND });
-            return res;
-        }
-
-        const payload = {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            elo_rating: (user as any).elo_rating,
-            avatar_url: user.avatar_url,
-            created_at: user.created_at,
-        };
-
-        res.status(RESPONSE_CODES.SUCCESS_HTTP_CODE).send({ success: true, data: payload });
-        return res;
+        const serviceResponse = await this.userService.getUserProfile(userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Post('/generateToken')
-    public async getTestToken(@Body() body: any, @Res() res: Response){
+    public async getTestToken(@Body() body: any, @Res() res: Response) {
         if (!body.email) {
-            res.status(RESPONSE_CODES.INVALID_INPUT).send({ success: false, data: RESPONSE_MESSAGES.INVALID_INPUT });
-            return res;
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
         }
 
-        const serviceResponse = await authService.generateTestToken(body.email);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-            return res;
-        } else {
-            const statusCode = serviceResponse.responseCode >= 100 && serviceResponse.responseCode < 600 ? serviceResponse.responseCode : 400;
-            res.status(statusCode).send({ success: false, data: serviceResponse.responseMessage });
-            return res;
-        }
+        const serviceResponse = await this.authService.generateTestToken(body.email);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 }
-
-export const authController = new AuthController();

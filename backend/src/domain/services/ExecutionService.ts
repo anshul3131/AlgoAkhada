@@ -1,13 +1,31 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Service for running user code against sample and custom test cases in C++ and Python
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
+import { Service, Container } from "typedi";
 import { ExecuteCodeRequestDTO, LanguageResponseDTO, RunMode, ExecutionResponseDTO } from "../classes/ExecutionDTO";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
-import { problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
+import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
 import { Language } from "../enums/CodeLanguage";
 import { cppExecutor } from "./CppExecutorService";
 import { pythonExecutor } from "./PythonExecutorService";
 import { ExecutionResult } from "../interfaces/CodeExecutor";
 import { TestCase } from "../entities/TestCase";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
+import { _SECOND_MS, EMPTY_STRING } from "../../constants/AppConstant";
 
+const DEFAULT_TIMEOUT_SEC = 2;
+
+@Service()
 export class ExecutionService {
+    private problemRepository: ProblemRepository;
+
+    constructor() {
+        this.problemRepository = problemRepository;
+    }
 
     public async getSupportedLanguages(): Promise<ResponseData> {
         const payload: LanguageResponseDTO[] = [
@@ -28,12 +46,11 @@ export class ExecutionService {
                     return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT);
                 }
                 
-                const problem = await problemRepository.getProblemById(problemId);
+                const problem = await this.problemRepository.getProblemById(problemId);
                 if (!problem) {
                     return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND);
                 }
 
-                // Filter test cases where isHidden is false
                 let availableSamples = (problem.testCases || []).filter(tc => !tc.isHidden);
 
                 if (sampleIds && Array.isArray(sampleIds) && sampleIds.length > 0) {
@@ -46,8 +63,11 @@ export class ExecutionService {
                 if (!inputs || !Array.isArray(inputs) || inputs.length === 0) {
                     return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT);
                 }
-                // Mock a test case for each custom input
-                testCasesToRun = inputs.map((inp, index) => ({ id: `custom-${index + 1}`, input: inp, expectedOutput: "" } as TestCase));
+                testCasesToRun = inputs.map((inp, index) => ({ 
+                    id: `custom-${index + 1}`, 
+                    input: inp, 
+                    expectedOutput: EMPTY_STRING 
+                } as TestCase));
             } else {
                 return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT);
             }
@@ -56,8 +76,7 @@ export class ExecutionService {
                 return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND);
             }
 
-            // Await execution synchronously
-            const timeLimit = timeoutMs ? timeoutMs / 1000 : 2; 
+            const timeLimit = timeoutMs ? timeoutMs / _SECOND_MS : DEFAULT_TIMEOUT_SEC; 
             let response: ExecutionResult;
             
             switch (language) {
@@ -85,10 +104,10 @@ export class ExecutionService {
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
 
         } catch (error: any) {
-            console.error(`[ExecutionService] executeCode error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'ExecutionService', 'executeCode', { problemId: requestDTO.problemId, language: requestDTO.language });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 }
 
-export const executionService = new ExecutionService();
+export const executionService = Container.get(ExecutionService);

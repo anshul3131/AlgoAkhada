@@ -1,24 +1,41 @@
-import { problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Service for queuing asynchronous test case batch upload jobs to Kafka
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
+import { Service, Container } from "typedi";
+import { problemRepository, ProblemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
 import { kafkaProducerClient } from "../../infrastructure/kafka/KafkaProducerClient";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
 
+@Service()
 export class TestCaseService {
-    
-    async queueTestCaseBatchUpload(problemId: string, fileUrl: string): Promise<void> {
-        // 1. Verify the problem actually exists before queuing
-        const problem = await problemRepository.getProblemById(problemId);
-        if (!problem) {
-            throw new Error("PROBLEM_NOT_FOUND");
-        }
+    private problemRepository: ProblemRepository;
 
-        // 2. Push the async processing job to Kafka
-        const kafkaPayload = { 
-            problemId: problem.id, 
-            fileUrl 
-        };
-        
-        // We use a dedicated topic for this specific heavy workload
-        await kafkaProducerClient.sendMessage("testcase-uploads", kafkaPayload);
+    constructor() {
+        this.problemRepository = problemRepository;
+    }
+    
+    public async queueTestCaseBatchUpload(problemId: string, fileUrl: string): Promise<void> {
+        try {
+            const problem = await this.problemRepository.getProblemById(problemId);
+            if (!problem) {
+                throw new Error("PROBLEM_NOT_FOUND");
+            }
+
+            const kafkaPayload = { 
+                problemId: problem.id, 
+                fileUrl 
+            };
+            
+            await kafkaProducerClient.sendMessage("testcase-uploads", kafkaPayload);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, 'TestCaseService', 'queueTestCaseBatchUpload', { problemId, fileUrl });
+            throw error;
+        }
     }
 }
 
-export const testCaseService = new TestCaseService();
+export const testCaseService = Container.get(TestCaseService);

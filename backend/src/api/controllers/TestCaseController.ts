@@ -1,46 +1,56 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for async test case dataset batch uploading
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { JsonController, Post, Body, Res, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { testCaseService } from "../../domain/services/TestCaseService";
+import { Container } from "typedi";
+import { TestCaseService } from "../../domain/services/TestCaseService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import { UploadTestCasesDTO } from "../../domain/classes/UploadTestCasesDTO";
+import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../../domain/classes/ResponseDTO";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
 
+const ACCEPTED_HTTP_STATUS = 202;
 
-// 2. Simplify the base route
 @JsonController("/api/testcases")
 @Authorized()
 export class TestCaseController {
+    private testCaseService: TestCaseService;
+
+    constructor() {
+        this.testCaseService = Container.get(TestCaseService);
+    }
     
     @Post("/batch-upload")
-    async uploadTestCases(
-        @Body() body: UploadTestCasesDTO, // Grab the entire payload here
+    public async uploadTestCases(
+        @Body() body: UploadTestCasesDTO,
         @Res() res: Response
     ) {
         try {
-            // 3. Destructure both fields from the body
             const { problemId, fileUrl } = body;
 
-            // 4. Validate that both exist
             if (!problemId || !fileUrl) {
-                return ResponseBuilder.error(res, "INVALID_INPUT", "Both problemId and fileUrl are required", 400);
+                return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, "Both problemId and fileUrl are required"));
             }
 
-            // Queue the job via the service layer
-            await testCaseService.queueTestCaseBatchUpload(problemId, fileUrl);
+            await this.testCaseService.queueTestCaseBatchUpload(problemId, fileUrl);
             
-            // Return 202 Accepted
-            return ResponseBuilder.success(res,202, { 
+            return ResponseBuilder.success(res, ACCEPTED_HTTP_STATUS, { 
                 message: "Test case upload queued for processing.",
                 problemId 
             });
-
         } catch (error: any) {
-            console.error(`[TestCaseController] uploadTestCases error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'TestCaseController', 'uploadTestCases');
             
             if (error.message === "PROBLEM_NOT_FOUND") {
-                return ResponseBuilder.error(res, "NOT_FOUND", "Problem not found", 404);
+                return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND));
             }
             
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG));
         }
     }
 }

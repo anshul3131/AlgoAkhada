@@ -1,3 +1,10 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Centralized Redis key generators and pattern definitions for cache keys
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 export class RedisKeys {
     /**
      * Key for user session refresh tokens

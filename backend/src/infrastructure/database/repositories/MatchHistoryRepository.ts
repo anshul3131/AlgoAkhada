@@ -1,8 +1,17 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for MatchHistory records connecting matches, users, and evaluated submissions
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner, In } from "typeorm";
+import { Service } from "typedi";
 import { MatchHistory } from "../../../domain/entities/MatchHistory";
 import { AppDataSource } from "../data_source";
 import { SubmissionStatus } from "../../../domain/entities/Submission";
 
+@Service()
 export class MatchHistoryRepository extends Repository<MatchHistory> {
     constructor() {
         super(MatchHistory, AppDataSource.createEntityManager());
@@ -22,7 +31,7 @@ export class MatchHistoryRepository extends Repository<MatchHistory> {
                 user: { id: userId },
                 submission: { status: SubmissionStatus.ACCEPTED }
             },
-            relations: {submission : true}
+            relations: { submission: true }
         });
     }
 

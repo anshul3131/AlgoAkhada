@@ -1,49 +1,50 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for user dashboard analytics, live match spectating, and composite home-screen
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { JsonController, Get, Req, Res, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { dashboardService } from "../../domain/services/DashboardService";
-import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
+import { Container } from "typedi";
+import { DashboardService } from "../../domain/services/DashboardService";
+import { ResponseBuilder } from "../../utils/ResponseBuilder";
 
 @JsonController("/api/dashboard")
 export class DashboardController {
+    private dashboardService: DashboardService;
+
+    constructor() {
+        this.dashboardService = Container.get(DashboardService);
+    }
+
     @Get("/")
     @Authorized()
-    async getDashboardStats(
+    public async getDashboardStats(
         @Req() req: any,
         @Res() res: Response
     ) {
         const userId = req.user.id;
-        const serviceResponse = await dashboardService.getDashboardStats(userId);
-        
-        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.dashboardService.getDashboardStats(userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/live")
     @Authorized()
-    async getLiveMatches(@Res() res: Response) {
-        const serviceResponse = await dashboardService.getLiveMatches();
-        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+    public async getLiveMatches(@Res() res: Response) {
+        const serviceResponse = await this.dashboardService.getLiveMatches();
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/home-screen")
     @Authorized()
-    async getHomeScreen(
+    public async getHomeScreen(
         @Req() req: any,
         @Res() res: Response
     ) {
         const userId = req.user.id;
-        const serviceResponse = await dashboardService.getHomeScreenData(userId);
-        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.dashboardService.getHomeScreenData(userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 }

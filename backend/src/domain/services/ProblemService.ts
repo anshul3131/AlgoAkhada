@@ -1,37 +1,59 @@
-import { Submission, SubmissionStatus } from "../entities/Submission";
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Service for problem management, tag exploration, detail resolution, and bulk ingestion
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
 
+import { Service, Container } from "typedi";
+import { Submission, SubmissionStatus } from "../entities/Submission";
 import { Problem, ProblemDifficulty } from "../entities/Problem";
 import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
-import { submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
+import { SubmissionRepository, submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
 import { AppDataSource } from "../../infrastructure/database/data_source";
 import { TestCase } from "../entities/TestCase";
 import { ProblemTag } from "../enums/ProblemTag";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
-import { ProblemDetailDTO, ProblemListResponseDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
+import { ProblemDetailDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
 import { ProblemFormatter } from "../../utils/ProblemFormatter";
 import { redisCache } from "../../infrastructure/redis/RedisCache";
 import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
+import { logger } from "../../utils/LogglyClient";
+import { cacheExpirySeconds } from "../../constants/CacheConstants";
+import { DEFAULT_PAGE, DEFAULT_PAGE_LIMIT } from "../../constants/AppConstant";
 
+const DEFAULT_TIME_LIMIT_SEC = 2;
+const DEFAULT_MEMORY_LIMIT_MB = 256;
+
+@Service()
 export class ProblemService {
+    private problemRepository: ProblemRepository;
+    private submissionRepository: SubmissionRepository;
+
+    constructor() {
+        this.problemRepository = problemRepository;
+        this.submissionRepository = submissionRepository;
+    }
     
-    async createProblem(title: string, description: string,difficulty?: ProblemDifficulty, timeLimit?: number, memoryLimit?: number): Promise<ResponseData> {
+    public async createProblem(title: string, description: string, difficulty?: ProblemDifficulty, timeLimit?: number, memoryLimit?: number): Promise<ResponseData> {
         try {
             const problemData = new Problem();
             problemData.title = title;
             problemData.description = description;
             problemData.difficulty = difficulty || ProblemDifficulty.MEDIUM; 
-            problemData.timeLimit = timeLimit || 2;
-            problemData.memoryLimit = memoryLimit || 256;
+            problemData.timeLimit = timeLimit || DEFAULT_TIME_LIMIT_SEC;
+            problemData.memoryLimit = memoryLimit || DEFAULT_MEMORY_LIMIT_MB;
             
-            const saved = await problemRepository.saveEntity(problemData);
-            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, "Problem Created Successfuly", saved);
+            const saved = await this.problemRepository.saveEntity(problemData);
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, saved);
         } catch (error: any) {
-            console.error(`[ProblemService] createProblem error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'createProblem', { title });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 
-    async getTags(): Promise<ResponseData> {
+    public async getTags(): Promise<ResponseData> {
         try {
             const cacheKey = RedisKeys.getProblemTagsKey();
             try {
@@ -40,30 +62,30 @@ export class ProblemService {
                     return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
                 }
             } catch (cacheErr: any) {
-                console.warn(`[ProblemService] Redis get tags failed: ${cacheErr.message}`);
+                logger.warn(`[ProblemService] Redis get tags failed: ${cacheErr.message}`);
             }
 
             const data: TagsResponseDTO = { tags: Object.values(ProblemTag) };
 
             try {
-                await redisCache.set(cacheKey, data, { EX: 3600 });
+                await redisCache.set(cacheKey, data, { EX: cacheExpirySeconds.ONE_HOUR });
             } catch (cacheErr: any) {
-                console.warn(`[ProblemService] Redis set tags failed: ${cacheErr.message}`);
+                logger.warn(`[ProblemService] Redis set tags failed: ${cacheErr.message}`);
             }
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {
-            console.error(`[ProblemService] getTags error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'getTags');
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 
-    async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string, userId?: string): Promise<ResponseData> {
+    public async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string, userId?: string): Promise<ResponseData> {
         try {
-            page = page ? Number(page) : 1;
-            limit = limit ? Number(limit) : 20;
+            const pageNum = page ? Number(page) : DEFAULT_PAGE;
+            const limitNum = limit ? Number(limit) : DEFAULT_PAGE_LIMIT;
 
-            const result = await problemRepository.getAllProblems(page, limit, difficulty, search, tag);
+            const result = await this.problemRepository.getAllProblems(pageNum, limitNum, difficulty, search, tag);
             
             let solvedProblemIds = new Set<string>();
             if (userId) {
@@ -92,19 +114,19 @@ export class ProblemService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, responsePayload);
         } catch (error: any) {
-            console.error(`[ProblemService] getAllProblems error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'getAllProblems', { page, limit, difficulty, search, tag });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 
-    async getProblemDetails(id: string, userId?: string): Promise<ResponseData> {
+    public async getProblemDetails(id: string, userId?: string): Promise<ResponseData> {
         try {
-            const problem = await problemRepository.getProblemById(id);
+            const problem = await this.problemRepository.getProblemById(id);
             if (!problem) {
-                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, "Problem not found");
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND);
             }
 
-            const samples : ProblemSampleDTO[] = (problem.testCases || [])
+            const samples: ProblemSampleDTO[] = (problem.testCases || [])
                 .filter(tc => !tc.isHidden)
                 .map(tc => ({
                     id: tc.id,
@@ -132,11 +154,10 @@ export class ProblemService {
                     order: { submittedAt: 'DESC' },
                     select: { id: true, status: true, language: true, submittedAt: true, executionTimeMs: true }
                 });
-                console.log("pastSubs for problem", id, userId, ":", pastSubs);
                 if (pastSubs.length > 0) {
                     payload.pastSubmissions = pastSubs;
                 }
-                const sub = await submissionRepository.getLastAcceptedSubmission(id, userId);
+                const sub = await this.submissionRepository.getLastAcceptedSubmission(id, userId);
                 if (sub) {
                     payload.lastSubmission = { code: sub.code, language: sub.language };
                 }
@@ -144,7 +165,7 @@ export class ProblemService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
-            console.error(`[ProblemService] getProblemDetails error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'getProblemDetails', { id, userId });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
@@ -163,8 +184,8 @@ export class ProblemService {
                 problem.title = item.title;
                 problem.description = item.description;
                 problem.difficulty = item?.difficulty || ProblemDifficulty.MEDIUM;
-                problem.timeLimit = item.timeLimit || 2;
-                problem.memoryLimit = item.memoryLimit || 256;
+                problem.timeLimit = item.timeLimit || DEFAULT_TIME_LIMIT_SEC;
+                problem.memoryLimit = item.memoryLimit || DEFAULT_MEMORY_LIMIT_MB;
                 problem.tags = item.tags || [];
                 
                 const savedProblem = await queryRunner.manager.save(problem);
@@ -185,16 +206,15 @@ export class ProblemService {
             }
 
             await queryRunner.commitTransaction();
-            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, "Dataset ingested successfully!", { problemsAdded, testCasesAdded });
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { problemsAdded, testCasesAdded });
         } catch (error: any) {
             await queryRunner.rollbackTransaction();
-            console.error("❌ Bulk upload transaction failed. Rolling back...", error);
-            return ResponseData.build(RESPONSE_CODES.FAILURE, "Failed to ingest dataset. Transaction rolled back.");
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'bulkCreateProblems');
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         } finally {
             await queryRunner.release();
         }
     }
 }
 
-// Export a single instance to act as a Singleton across the API
-export const problemService = new ProblemService();
+export const problemService = Container.get(ProblemService);

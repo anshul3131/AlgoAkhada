@@ -1,9 +1,18 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for CustomMatch (Lobby) entity queries, join code lookups, and public lobbies
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { CustomMatch } from "../../../domain/entities/CustomMatch";
 import { AppDataSource } from "../data_source";
 import { MatchStatus } from "../../../domain/enums/MatchStatus";
 import { PublicLobbyDTO } from "../../../domain/classes/PublicLobbyDTO";
 
+@Service()
 export class CustomMatchRepository extends Repository<CustomMatch> {
     constructor() {
         super(CustomMatch, AppDataSource.createEntityManager());

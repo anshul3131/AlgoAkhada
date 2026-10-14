@@ -1,12 +1,19 @@
-import { exec, spawn } from 'child_process';
-import path from 'path';
-import { SubmissionStatus } from '../entities/Submission'; // Ensure this matches your path
-import { CodeExecutor} from '../interfaces/CodeExecutor';
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : C++ code execution service compiling natively and running containerized batches
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
 
+import { exec, spawn } from "child_process";
+import path from "path";
+import { Service } from "typedi";
+import { CodeExecutor } from "../interfaces/CodeExecutor";
 
-export class CppExecutor extends CodeExecutor{
-    protected fileExtension = 'cpp';
-    protected executableExtension = 'out';
+@Service()
+export class CppExecutor extends CodeExecutor {
+    protected fileExtension = "cpp";
+    protected executableExtension = "out";
     
     protected compileNative(sourcePath: string, outPath: string, jobFolder: string): Promise<{ success: boolean; error?: string }> {
         return new Promise((resolve) => {
@@ -29,25 +36,25 @@ export class CppExecutor extends CodeExecutor{
             const jobId = path.basename(jobFolder);
             
             const cmdArgs = [
-                'exec',
-                '-i',
-                '-w', `/jobs/${jobId}`,
-                'cp-cpp-runner',
-                'bash',
-                'runner.sh',
+                "exec",
+                "-i",
+                "-w", `/jobs/${jobId}`,
+                "cp-cpp-runner",
+                "bash",
+                "runner.sh",
                 testCount.toString(),
-                './main.out',
+                "./main.out",
                 globalTimeLimitMs.toString()
             ];
 
-            const child = spawn('docker', cmdArgs);
+            const child = spawn("docker", cmdArgs);
 
             const timeoutId = setTimeout(() => {
-                child.kill('SIGKILL');
+                child.kill("SIGKILL");
                 resolve();
             }, globalTimeLimitMs + 5000); // Docker overhead buffer
 
-            child.on('close', () => {
+            child.on("close", () => {
                 clearTimeout(timeoutId);
                 resolve();
             });

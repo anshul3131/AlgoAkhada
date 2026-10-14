@@ -1,3 +1,10 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : TypeORM Data Source initialization and entity mapping
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "../../domain/entities/User";
@@ -17,7 +24,7 @@ export const AppDataSource = new DataSource({
     // Read from K8s env vars, fallback to localhost for local Mac development
     host: process.env.DB_HOST || "localhost", 
     // process.env returns a string, so we must parse it into a number for TypeORM
-    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432, 
+    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432, 
     username: process.env.DB_USERNAME || "postgres",
     password: process.env.DB_PASSWORD || "password123",
     database: process.env.DB_NAME || "cp_matchmaker_db",

@@ -1,39 +1,62 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Service for code submission lifecycle, Kafka event publishing, and submission querying
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
+import { Service, Container } from "typedi";
 import { Submission } from "../entities/Submission";
-import { submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
-import { userRepository } from "../../infrastructure/database/repositories/UserRepository";
-import { problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
+import { submissionRepository, SubmissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
+import { userRepository, UserRepository } from "../../infrastructure/database/repositories/UserRepository";
+import { problemRepository, ProblemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
 import { kafkaProducerClient } from "../../infrastructure/kafka/KafkaProducerClient";
 import { Language } from "../enums/CodeLanguage";
 import { AppDataSource } from "../../infrastructure/database/data_source";
 import { RESPONSE_CODES, RESPONSE_MESSAGES, ResponseData } from "../classes/ResponseDTO";
 import { SubmissionDTO } from "../classes/SubmissionDTO";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
+import { DEFAULT_PAGE, DEFAULT_PAGE_LIMIT, EMPTY_STRING } from "../../constants/AppConstant";
 
+@Service()
 export class SubmissionService {
-    async createSubmission(userId: string, problemId: string, language: Language, code: string, mode: 'match' | 'upsolve' | 'custom' = 'match', matchId?: string): Promise<Submission> {
-        // 1. Validate relations exist in the database
-        const user = await userRepository.getUserById(userId);
+    private submissionRepository: SubmissionRepository;
+    private userRepository: UserRepository;
+    private problemRepository: ProblemRepository;
+
+    constructor() {
+        this.submissionRepository = submissionRepository;
+        this.userRepository = userRepository;
+        this.problemRepository = problemRepository;
+    }
+
+    public async createSubmission(
+        userId: string, 
+        problemId: string, 
+        language: Language, 
+        code: string, 
+        mode: 'match' | 'upsolve' | 'custom' = 'match', 
+        matchId?: string
+    ): Promise<Submission> {
+        const user = await this.userRepository.getUserById(userId);
         if (!user) throw new Error("USER_NOT_FOUND");
 
-        const problem = await problemRepository.getProblemById(problemId);
+        const problem = await this.problemRepository.getProblemById(problemId);
         if (!problem) throw new Error("PROBLEM_NOT_FOUND");
 
-        // 2. Start a Database Transaction
         const queryRunner = AppDataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
         try {
-            // Create the PENDING submission in Postgres
-            const submissionData = submissionRepository.create({
+            const submissionData = this.submissionRepository.create({
                 user,
                 problem,
                 language,
                 code
-                // status automatically defaults to PENDING via the TypeORM entity
             });
-            const savedSubmission = await submissionRepository.saveEntity(submissionData, queryRunner);
+            const savedSubmission = await this.submissionRepository.saveEntity(submissionData, queryRunner);
 
-            // 3. Publish the event to Kafka for the background workers to consume
             const kafkaPayload = { 
                 submissionId: savedSubmission.id, 
                 language, 
@@ -45,35 +68,30 @@ export class SubmissionService {
             };
             
             await kafkaProducerClient.sendMessage("code-submissions", kafkaPayload);
-
-            // Commit the transaction
             await queryRunner.commitTransaction();
 
             return savedSubmission;
-        } catch (error) {
-            // If anything fails (e.g. Kafka down), rollback the database transaction
+        } catch (error: any) {
             await queryRunner.rollbackTransaction();
-            console.error("❌ Submission transaction failed. Rolling back...", error);
+            ErrorLoggingUtils.logError(error, 'SubmissionService', 'createSubmission', { userId, problemId, mode });
             throw error;
         } finally {
-            // Release the connection back to the pool
             await queryRunner.release();
         }
     }
 
-
-    async getUserSubmissions(userId: string, page: number, limit: number, status?: string, topic?: string): Promise<ResponseData> {
+    public async getUserSubmissions(userId: string, page: number, limit: number, status?: string, topic?: string): Promise<ResponseData> {
         try {
-            page = page ? Number(page) : 1;
-            limit = limit ? Number(limit) : 20;
+            const pageNum = page ? Number(page) : DEFAULT_PAGE;
+            const limitNum = limit ? Number(limit) : DEFAULT_PAGE_LIMIT;
 
             const subRepo = AppDataSource.getRepository(Submission);
             const query = subRepo.createQueryBuilder("submission")
                 .leftJoinAndSelect("submission.problem", "problem")
                 .where("submission.user.id = :userId", { userId })
                 .orderBy("submission.submittedAt", "DESC")
-                .skip((page - 1) * limit)
-                .take(limit);
+                .skip((pageNum - 1) * limitNum)
+                .take(limitNum);
 
             if (status) {
                 query.andWhere("submission.status = :status", { status });
@@ -102,22 +120,22 @@ export class SubmissionService {
                 } : null
             }));
 
-            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { items, total, page, limit });
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { items, total, page: pageNum, limit: limitNum });
         } catch (error: any) {
-            console.error(`[SubmissionService] getUserSubmissions error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'SubmissionService', 'getUserSubmissions', { userId, page, limit });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 
-    async getSubmissionById(submissionId: string): Promise<ResponseData> {
+    public async getSubmissionById(submissionId: string): Promise<ResponseData> {
         try {
             if (!submissionId) {
                 return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT);
             }
 
-            const submission = await submissionRepository.findOne({
+            const submission = await this.submissionRepository.findOne({
                 where: { id: submissionId },
-                relations: {problem : true}
+                relations: { problem: true }
             });
 
             if (!submission) {
@@ -126,8 +144,8 @@ export class SubmissionService {
 
             const data: SubmissionDTO = {
                 submissionId: submission.id,
-                problemId: submission.problem ? submission.problem.id : "",
-                problemTitle: submission.problem ? submission.problem.title : "",
+                problemId: submission.problem ? submission.problem.id : EMPTY_STRING,
+                problemTitle: submission.problem ? submission.problem.title : EMPTY_STRING,
                 language: submission.language,
                 code: submission.code,
                 status: submission.status
@@ -135,10 +153,10 @@ export class SubmissionService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {
-            console.error(`[SubmissionService] getSubmissionById error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'SubmissionService', 'getSubmissionById', { submissionId });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 }
 
-export const submissionService = new SubmissionService();
+export const submissionService = Container.get(SubmissionService);

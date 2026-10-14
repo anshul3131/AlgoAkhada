@@ -1,10 +1,17 @@
-import { Kafka, Consumer, EachMessagePayload, Message, logLevel } from "kafkajs";
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Centralized Kafka consumer client processing code submissions, matchmaking, and match outcome events
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
+import { Kafka, Consumer, EachMessagePayload, logLevel } from "kafkajs";
 import { cppExecutor } from "../../domain/services/CppExecutorService";
-import {testCaseRepository} from "../database/repositories/TestCaseRepository";
+import { testCaseRepository } from "../database/repositories/TestCaseRepository";
 import { problemRepository } from "../database/repositories/ProblemRepository";
 import { submissionRepository } from "../database/repositories/SubmissionRepository";
 import { SubmissionStatus } from "../../domain/entities/Submission";
-import { appEvents } from "../../utils/EventEmitter"; // Import the global bridge
+import { appEvents } from "../../utils/EventEmitter";
 import { ExecutionResult } from "../../domain/interfaces/CodeExecutor";
 import { Language } from "../../domain/enums/CodeLanguage";
 import { pythonExecutor } from "../../domain/services/PythonExecutorService";
@@ -15,21 +22,25 @@ import { matchHistoryRepository } from "../database/repositories/MatchHistoryRep
 import { customMatchRepository } from "../database/repositories/CustomMatchRepository";
 import { customMatchParticipantRepository } from "../database/repositories/CustomMatchParticipantRepository";
 import { SubmissionMode } from "../../domain/classes/SubmissionDTO";
+import { logger } from "../../utils/LogglyClient";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
+import { KafkaTopics, KafkaEvents, KafkaConfig } from "../../constants/KafkaConstants";
+import { _MINUTE_MS, TEN } from "../../constants/AppConstant";
 
 class KafkaConsumerClient {
     private consumer: Consumer;
 
     constructor() {
         const kafka = new Kafka({
-            clientId: "cp-arena-consumer",
+            clientId: KafkaConfig.CLIENT_ID_CONSUMER,
             brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
             logLevel: logLevel.INFO,
             logCreator: (level) => {
                 return ({ namespace, level, label, log }) => {
                     if (log.error === "The group coordinator is not available") {
-                        return; // Suppress this specific noisy error
+                        return;
                     }
-                    const prefix = namespace ? `[${namespace}] ` : '';
+                    const prefix = namespace ? `[${namespace}] ` : "";
                     const message = JSON.stringify(
                         Object.assign({ level: label }, log, {
                             message: `${prefix}${log.message}`,
@@ -38,114 +49,118 @@ class KafkaConsumerClient {
 
                     switch (level) {
                         case logLevel.INFO:
-                            return console.info(message);
+                            return logger.info(message);
                         case logLevel.ERROR:
-                            return console.error(message);
+                            return logger.error(message);
                         case logLevel.WARN:
-                            return console.warn(message);
+                            return logger.warn(message);
                         case logLevel.DEBUG:
-                            return console.log(message);
+                            return logger.debug(message);
                     }
                 };
             }
         });
 
         this.consumer = kafka.consumer({
-            groupId: 'cp-arena-consumer', // Keep whatever your group ID is
-
-            // Decrease session timeout to 30 seconds so ghost consumers are kicked out faster
-            sessionTimeout: 30000,
-
-            // Heartbeat interval pings Kafka to let it know the worker is still alive
-            heartbeatInterval: 10000,
+            groupId: KafkaConfig.CONSUMER_GROUP_ID,
+            sessionTimeout: KafkaConfig.SESSION_TIMEOUT_MS,
+            heartbeatInterval: KafkaConfig.HEARTBEAT_INTERVAL_MS,
         });
     }
 
     public async connectAndSubscribe() {
         try {
             await this.consumer.connect();
-            console.log("✅ Kafka Consumer connected successfully.");
+            logger.info("✅ Kafka Consumer connected successfully.");
 
-            // Subscribe to our topic. 
-            // fromBeginning: true means if the worker crashes and misses messages, 
-            // it will read the backlog when it boots back up.
             await this.consumer.subscribe({ 
-                topics: ["code-submissions", "testcase-uploads", "matchmaking-events", "match-events", "matchmaking-requests"],
+                topics: [
+                    KafkaTopics.CODE_SUBMISSIONS,
+                    KafkaTopics.TESTCASE_UPLOADS,
+                    KafkaTopics.MATCHMAKING_EVENTS,
+                    KafkaTopics.MATCH_EVENTS,
+                    KafkaTopics.MATCHMAKING_REQUESTS
+                ],
                 fromBeginning: true 
             });
 
-            // Start the infinite listening loop
             await this.consumer.run({
-                partitionsConsumedConcurrently: 6,
+                partitionsConsumedConcurrently: KafkaConfig.CONCURRENT_PARTITIONS,
                 eachMessage: async ({ topic, partition, message }: EachMessagePayload) => {
                     let parsedMessageValue;
                     try {
                         parsedMessageValue = JSON.parse(String(message?.value));
                     } catch (err: any) {
-                        console.error(`Error parsing kafka message : ${message}, error :: ${err.message}`);
+                        ErrorLoggingUtils.logError(err, "KafkaConsumerClient", "eachMessage.JSONParse", {
+                            topic,
+                            partition,
+                            rawMessage: String(message?.value)
+                        });
                     }
+
                     try {
                         switch (topic) {
-                            case "code-submissions":
+                            case KafkaTopics.CODE_SUBMISSIONS:
                                 await this.handleCodeSubmission(parsedMessageValue);
                                 break;
-                            case "testcase-uploads":
+                            case KafkaTopics.TESTCASE_UPLOADS:
                                 await this.handleTestCaseUpload(parsedMessageValue);
                                 break;
-                            case "matchmaking-events":
+                            case KafkaTopics.MATCHMAKING_EVENTS:
                                 this.handleMatchmakingEvent(parsedMessageValue);
                                 break;
-                            case "match-events":
+                            case KafkaTopics.MATCH_EVENTS:
                                 this.handleMatchEvent(parsedMessageValue);
                                 break;
-                            case "matchmaking-requests":
+                            case KafkaTopics.MATCHMAKING_REQUESTS:
                                 await this.handleMatchmakingRequest(parsedMessageValue);
                                 break;
                             default:
-                                console.warn(`⚠️ Received message for unknown topic: ${topic}`);
+                                logger.warn(`Received message for unknown topic: ${topic}`);
                         }
-                    } catch (error) {
-                        console.error(`❌ Unrecoverable error processing topic ${topic}:`, error);
-                        // TODO: Send this broken message to a Dead Letter Queue (DLQ) 
-                        // so you can investigate it later without losing the user's submission.
+                    } catch (error: any) {
+                        ErrorLoggingUtils.logError(error, "KafkaConsumerClient", "eachMessage.dispatch", {
+                            topic,
+                            partition,
+                            parsedMessageValue
+                        });
                     }
                 },
             });
-        } catch (error) {
-            console.error("❌ Fatal error in Kafka Consumer:", error);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, "KafkaConsumerClient", "connectAndSubscribe");
             throw error;
         }
     }
 
     public async gracefulShutdown() {
         try {
-            console.log("🛑 Disconnecting Kafka Consumer...");
+            logger.info("Disconnecting Kafka Consumer...");
             await this.consumer.disconnect();
-            console.log("✅ Kafka Consumer disconnected.");
-        } catch (error) {
-            console.error("❌ Error disconnecting Kafka Consumer:", error);
+            logger.info("Kafka Consumer disconnected successfully.");
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, "KafkaConsumerClient", "gracefulShutdown");
         }
     }
 
     private async handleCodeSubmission(message: any) {
         try {
-            const {language,problemId, code, submissionId,userId, mode} = message;
+            const { language, problemId, code, submissionId, userId, mode } = message;
 
             const problem = await problemRepository.getProblemById(problemId);
             if (!problem) {
-                console.error(`Problem ID ${problemId} not found for submission.`);
-                return; // Or update database to mark submission as "Failed: Invalid Problem"
+                logger.error(`Problem ID ${problemId} not found for submission.`);
+                return;
             }
 
             const testCases = await testCaseRepository.getTestCasesByProblemId(problemId);
             if (!testCases || testCases.length === 0) {
-                console.error(`No test cases found for problem ID ${problemId}.`);
+                logger.error(`No test cases found for problem ID ${problemId}.`);
                 return;
             }
 
-            let response : ExecutionResult;
-            // console.log(language)
-            switch(language){
+            let response: ExecutionResult;
+            switch (language) {
                 case Language.CPP:
                     response = await cppExecutor.execute(code, testCases, problem?.timeLimit);
                     break;
@@ -153,14 +168,14 @@ class KafkaConsumerClient {
                     response = await pythonExecutor.execute(code, testCases, problem?.timeLimit);
                     break;
                 default:
-                    throw new Error(`${language} not supported`)
+                    throw new Error(`Language ${language} not supported`);
             }
 
             await submissionRepository.updateStatus(submissionId, response.status);
 
-            //Alert the WebSocket server!
-            appEvents.emit('submission_graded', {
-                submissionId: submissionId,
+            // Alert the WebSocket server!
+            appEvents.emit(KafkaEvents.SUBMISSION_GRADED, {
+                submissionId,
                 status: response.status,
                 passed: response.passed,
                 total: response.total,
@@ -169,7 +184,7 @@ class KafkaConsumerClient {
                 memoryUsedMb: Math.round(Math.random() * 5 + 10)
             });
 
-            // === Match Integration ===                                                        
+            // Match Integration
             if (userId && mode === SubmissionMode.CUSTOM) {
                 const { matchId } = message;
                 const match = await customMatchRepository.getMatchById(matchId);
@@ -177,8 +192,8 @@ class KafkaConsumerClient {
                     let score = 0;
                     if (response.status === SubmissionStatus.ACCEPTED) {
                         const timeTakenMs = Date.now() - match.created_at.getTime();
-                        const totalTimeMs = match.timeLimit * 60 * 1000;
-                        score = Math.max(10, Math.floor(((totalTimeMs - timeTakenMs) / totalTimeMs) * 1000));
+                        const totalTimeMs = match.timeLimit * _MINUTE_MS;
+                        score = Math.max(TEN, Math.floor(((totalTimeMs - timeTakenMs) / totalTimeMs) * 1000));
                     }
                     
                     const participant = match.participants?.find(p => p.user.id === userId);
@@ -189,92 +204,75 @@ class KafkaConsumerClient {
                         }
                     }
 
-                    appEvents.emit('custom_submission_graded', {
+                    appEvents.emit(KafkaEvents.CUSTOM_SUBMISSION_GRADED, {
                         lobbyId: matchId,
-                        userId: userId,
-                        username: participant?.user?.username || 'Unknown',
+                        userId,
+                        username: participant?.user?.username || "Unknown",
                         status: response.status,
                         score: participant ? participant.score : 0,
                         passed: response.passed,
                         total: response.total,
                         compileError: response.compileError,
-                executionTimeMs: response.executionTimeMs,
-                memoryUsedMb: Math.round(Math.random() * 5 + 10)
+                        executionTimeMs: response.executionTimeMs,
+                        memoryUsedMb: Math.round(Math.random() * 5 + 10)
                     });
                 }
-            } else if (userId && mode !== SubmissionMode.UPSOLVE) {                                                                       
-                    const activeMatch = await matchService.getActiveMatchForUser(userId);           
-                    if (activeMatch) {                                                              
-                        
-                       
-                        let matchHistory = matchHistoryRepository.create({
-                            match: activeMatch,
-                            user: { id: userId } as any
-                        });
-                        
-                        matchHistory.submission = { id: submissionId } as any;
-                        await matchHistoryRepository.save(matchHistory);
+            } else if (userId && mode !== SubmissionMode.UPSOLVE) {
+                const activeMatch = await matchService.getActiveMatchForUser(userId);
+                if (activeMatch) {
+                    let matchHistory = matchHistoryRepository.create({
+                        match: activeMatch,
+                        user: { id: userId } as any
+                    });
+                    
+                    matchHistory.submission = { id: submissionId } as any;
+                    await matchHistoryRepository.save(matchHistory);
 
-                        // Notify opponent about the evaluation result                              
-                        await matchService.updateOpponentStatus(activeMatch.id, userId, {           
-                            status: response.status,                                                
-                            passed: response.passed,                                                
-                            total: response.total,
-                            compileError: response.compileError,
-                executionTimeMs: response.executionTimeMs,
-                memoryUsedMb: Math.round(Math.random() * 5 + 10)
-                        });
-    
-                        // If the user solved it, they win the match!
-                        if (response.status === SubmissionStatus.ACCEPTED) {
-                            await matchService.finishMatch(activeMatch.id, userId);
-                            console.log(`🏆 Match ${activeMatch.id} finished. Winner: ${userId}`);  
-                        }
+                    // Notify opponent about the evaluation result
+                    await matchService.updateOpponentStatus(activeMatch.id, userId, {
+                        status: response.status,
+                        passed: response.passed,
+                        total: response.total,
+                        compileError: response.compileError,
+                        executionTimeMs: response.executionTimeMs,
+                        memoryUsedMb: Math.round(Math.random() * 5 + 10)
+                    });
+
+                    // If the user solved it, they win the match!
+                    if (response.status === SubmissionStatus.ACCEPTED) {
+                        await matchService.finishMatch(activeMatch.id, userId);
+                        logger.info(`🏆 Match ${activeMatch.id} finished. Winner: ${userId}`);
                     }
                 }
-
-            switch(response.status){
-                case SubmissionStatus.WRONG_ANSWER:
-                    console.log(`❌Wrong Answer, TestCase ${response.passed+1} failed : ${response.failedTestCase}`);
-                    break;
-                case SubmissionStatus.ACCEPTED:
-                    console.log(`✅Accepted, Total Number of TestCases Passed : ${response.passed}`)
-                    break;
-                default:
-                    break;
             }
-            
-        }
-        catch (error) {
-            console.error("❌ Error processing code submission:", error);
+
+            logger.info(`Submission ${submissionId} graded: status=${response.status}, passed=${response.passed}/${response.total}`);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, "KafkaConsumerClient", "handleCodeSubmission", { message });
         }
     }
 
     private async handleTestCaseUpload(message: any) {
-        // Placeholder for actual test case upload processing logic
-        console.log("🔧 Processing test case upload:", message?.toString());
-        // Here you would typically parse the message, validate it, and then process the test case file.
+        logger.info(`Processing test case upload: ${JSON.stringify(message)}`);
     }
 
     private handleMatchmakingEvent(message: any) {
         const { type, payload } = message;
-        // type could be 'queue_status', 'match_found'
-        if (type === 'queue_status') {
-            appEvents.emit('queue_status', payload);
-        } else if (type === 'match_found') {
-            appEvents.emit('match_found', payload);
+        if (type === KafkaEvents.QUEUE_STATUS) {
+            appEvents.emit(KafkaEvents.QUEUE_STATUS, payload);
+        } else if (type === KafkaEvents.MATCH_FOUND) {
+            appEvents.emit(KafkaEvents.MATCH_FOUND, payload);
         }
     }
 
     private handleMatchEvent(message: any) {
         const { type, payload } = message;
-        // type could be 'opponent_status', 'match_result', 'elo_update'
-        if (type === 'opponent_status') {
-            appEvents.emit('opponent_status', payload);
-        } else if (type === 'match_result') {
-            appEvents.emit('match_result', payload);
-        } else if (type === 'elo_update') {
-            appEvents.emit('elo_update', payload);
+        if (type === KafkaEvents.OPPONENT_STATUS) {
+            appEvents.emit(KafkaEvents.OPPONENT_STATUS, payload);
+        } else if (type === KafkaEvents.MATCH_RESULT) {
+            appEvents.emit(KafkaEvents.MATCH_RESULT, payload);
+        } else if (type === KafkaEvents.ELO_UPDATE) {
+            appEvents.emit(KafkaEvents.ELO_UPDATE, payload);
         }
     }
 
@@ -287,10 +285,10 @@ class KafkaConsumerClient {
             if (user) {
                 await matchmakerService.addToQueue(user.id, user.elo_rating, tag);
             } else {
-                console.warn(`⚠️ User not found for matchmaking request: ${userId}`);
+                logger.warn(`User not found for matchmaking request: ${userId}`);
             }
-        } catch (error) {
-            console.error("❌ Error processing matchmaking request:", error);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, "KafkaConsumerClient", "handleMatchmakingRequest", { message });
         }
     }
 }

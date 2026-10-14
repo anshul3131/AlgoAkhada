@@ -1,7 +1,16 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for CustomMatchParticipant entity relations and participants lookup
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { CustomMatchParticipant } from "../../../domain/entities/CustomMatchParticipant";
 import { AppDataSource } from "../data_source";
 
+@Service()
 export class CustomMatchParticipantRepository extends Repository<CustomMatchParticipant> {
     constructor() {
         super(CustomMatchParticipant, AppDataSource.createEntityManager());

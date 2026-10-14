@@ -1,7 +1,16 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for Problem entity operations and complex filtered searches
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { Problem } from "../../../domain/entities/Problem";
 import { AppDataSource } from "../data_source";
 
+@Service()
 export class ProblemRepository extends Repository<Problem> {
     constructor() {
         super(Problem, AppDataSource.createEntityManager());

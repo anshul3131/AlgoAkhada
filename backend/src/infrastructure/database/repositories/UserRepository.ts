@@ -1,7 +1,17 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Data access repository for User entity operations and queries
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { Repository, QueryRunner } from "typeorm";
+import { Service } from "typedi";
 import { User } from "../../../domain/entities/User";
 import { AppDataSource } from "../data_source";
+import { DEFAULT_SEARCH_LIMIT } from "../../../constants/AppConstant";
 
+@Service()
 export class UserRepository extends Repository<User> {
     constructor() {
         // TypeORM 0.3.x requires passing the target entity and manager to super()
@@ -27,7 +37,7 @@ export class UserRepository extends Repository<User> {
         return await this.findOne({ where: { email } });
     }
 
-    async searchUsersByUsernamePrefix(prefix: string, limit: number = 10) {
+    async searchUsersByUsernamePrefix(prefix: string, limit: number = DEFAULT_SEARCH_LIMIT) {
         return await this.createQueryBuilder("user")
             .where("user.username ILIKE :prefix", { prefix: `${prefix}%` })
             .select(["user.id", "user.username", "user.elo_rating"])

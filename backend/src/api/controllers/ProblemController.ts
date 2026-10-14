@@ -1,44 +1,50 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for problem catalog, difficulty filtering, problem details, and bulk ingestion
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { JsonController, Post, Get, Body, Param, QueryParam, Res, Req, Authorized } from "routing-controllers";
 import { Response } from "express";
-import { problemService } from "../../domain/services/ProblemService";
+import { Container } from "typedi";
+import { ProblemService } from "../../domain/services/ProblemService";
 import { CreateProblemDTO } from "../../domain/classes/CreateProblemDTO";
-import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
+import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../../domain/classes/ResponseDTO";
+import { ResponseBuilder } from "../../utils/ResponseBuilder";
 
 @JsonController("/api/problems")
 @Authorized()
 export class ProblemController {
+    private problemService: ProblemService;
+
+    constructor() {
+        this.problemService = Container.get(ProblemService);
+    }
 
     @Post()
-    async createProblem(
+    public async createProblem(
         @Body() body: CreateProblemDTO,
         @Res() res: Response
     ) {
         const { title, description, difficulty, timeLimit, memoryLimit } = body;
         
         if (!title || !description) {
-            return res.status(400).send({ success: false, data: "Missing required fields" });
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
         }
 
-        const serviceResponse = await problemService.createProblem(title, description, difficulty, timeLimit, memoryLimit);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.problemService.createProblem(title, description, difficulty, timeLimit, memoryLimit);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/tags")
-    async getTags(@Res() res: Response) {
-        const serviceResponse = await problemService.getTags();
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+    public async getTags(@Res() res: Response) {
+        const serviceResponse = await this.problemService.getTags();
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get()
-    async getAllProblems(
+    public async getAllProblems(
         @QueryParam("page") page: number,
         @QueryParam("limit") limit: number,
         @QueryParam("difficulty") difficulty: string,
@@ -48,45 +54,33 @@ export class ProblemController {
         @Res() res: Response
     ) {
         const userId = req.user?.id;
-        const serviceResponse = await problemService.getAllProblems(page, limit, difficulty, search, tag, userId);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.problemService.getAllProblems(page, limit, difficulty, search, tag, userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/:id")
-    async getProblem(
+    public async getProblem(
         @Param("id") id: string,
         @Req() req: any,
         @Res() res: Response
     ) {
         const userId = req.user?.id;
-        const serviceResponse = await problemService.getProblemDetails(id, userId);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.problemService.getProblemDetails(id, userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Post("/bulk")
-    async bulkUpload(
+    public async bulkUpload(
         @Body() body: { dataset: any[] },
         @Res() res: Response
     ) {
         const { dataset } = body;
         
         if (!dataset || !Array.isArray(dataset)) {
-            return res.status(400).send({ success: false, data: "Invalid payload. Expected a 'dataset' array." });
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, "Invalid payload. Expected a 'dataset' array."));
         }
 
-        const serviceResponse = await problemService.bulkCreateProblems(dataset);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(201).send({ success: true, data: serviceResponse.data });
-        } else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.problemService.bulkCreateProblems(dataset);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 }

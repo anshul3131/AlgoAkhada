@@ -1,42 +1,45 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for fetching recent user matches and user win/loss statistics
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { JsonController, Get, QueryParam, Res, Authorized, Req } from "routing-controllers";
 import { Response } from "express";
-import { recentMatchService } from "../../domain/services/RecentMatchService";
+import { Container } from "typedi";
+import { RecentMatchService } from "../../domain/services/RecentMatchService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
-import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
+import { DEFAULT_RECENT_MATCHES_LIMIT } from "../../constants/AppConstant";
 
 @JsonController("/api/matches")
 @Authorized()
 export class RecentMatchController {
+    private recentMatchService: RecentMatchService;
+
+    constructor() {
+        this.recentMatchService = Container.get(RecentMatchService);
+    }
 
     @Get("/recent")
-    async getRecentMatches(
+    public async getRecentMatches(
         @QueryParam("limit") limit: number,
         @Res() res: Response,
-        @Req() req: any,
+        @Req() req: any
     ) {
-        limit = limit ? Number(limit) : 10;
+        const queryLimit = limit ? Number(limit) : DEFAULT_RECENT_MATCHES_LIMIT;
         const userId = req.user.id;
-
-        const serviceResponse = await recentMatchService.getRecentMatches(userId, limit, res);
-        if(serviceResponse.responseCode===RESPONSE_CODES.SUCCESS_HTTP_CODE){
-            return res.status(serviceResponse.responseCode).send({success : true,data : serviceResponse.data});
-        }
-        else{
-            return res.status(serviceResponse.responseCode).send({success : false,data : serviceResponse.data});
-        }
+        const serviceResponse = await this.recentMatchService.getRecentMatches(userId, queryLimit);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/stats")
-    async getUserStats(
+    public async getUserStats(
         @Res() res: Response,
-        @Req() req: any,
+        @Req() req: any
     ) {
         const userId = req.user.id;
-        const serviceResponse = await recentMatchService.getUserStats(userId);
-        if(serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE){
-            return res.status(serviceResponse.responseCode).send({success: true, data: serviceResponse.data});
-        } else {
-            return res.status(serviceResponse.responseCode).send({success: false, data: serviceResponse.data});
-        }
+        const serviceResponse = await this.recentMatchService.getUserStats(userId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 }

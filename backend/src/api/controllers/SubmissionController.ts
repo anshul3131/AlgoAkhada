@@ -1,37 +1,46 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Controller for code submission ingestion, query history, and individual submission inspection
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
 import { JsonController, Post, Get, Param, QueryParam, Body, Res, Authorized, Req } from "routing-controllers";
 import { Response } from "express";
-import { submissionService } from "../../domain/services/SubmissionService";
+import { Container } from "typedi";
+import { SubmissionService } from "../../domain/services/SubmissionService";
 import { ResponseBuilder } from "../../utils/ResponseBuilder";
 import { SubmitCodeDTO } from "../../domain/classes/SubmitCodeDTO";
-import { RESPONSE_CODES } from "../../domain/classes/ResponseDTO";
+import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../../domain/classes/ResponseDTO";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
 
+const ACCEPTED_HTTP_STATUS = 202;
 
 @JsonController("/api/submissions")
 @Authorized()
 export class SubmissionController {
+    private submissionService: SubmissionService;
+
+    constructor() {
+        this.submissionService = Container.get(SubmissionService);
+    }
     
     @Post()
-    async submitCode(
+    public async submitCode(
         @Req() req: any,
-        @Body() body: SubmitCodeDTO, // Grab the entire body here
+        @Body() body: SubmitCodeDTO,
         @Res() res: Response
     ) {
         try {
             const userId = req.user.id;
-            console.log(userId);
-            
-            // Destructure the payload safely
             const { problemId, language, code, mode, matchId } = body;
 
-            // Validate all required fields are present
             if (!problemId || !language || !code) {
-                return ResponseBuilder.error(res, "INVALID_INPUT", "Missing required fields", 400);
+                return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.INVALID_INPUT));
             }
 
-            // Execute the transaction and queue the job in Kafka
-            const submission = await submissionService.createSubmission(userId, problemId, language, code, mode, matchId);
+            const submission = await this.submissionService.createSubmission(userId, problemId, language, code, mode, matchId);
             
-            // Exclude the raw code from the response payload to keep the network response lightweight
             const responseData = {
                 id: submission.id,
                 language: submission.language,
@@ -41,22 +50,20 @@ export class SubmissionController {
                 submittedAt: submission.submittedAt
             };
             
-            return ResponseBuilder.success(res,202, responseData);
-
+            return ResponseBuilder.success(res, ACCEPTED_HTTP_STATUS, responseData);
         } catch (error: any) {
-            console.error(`[SubmissionController] submitCode error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'SubmissionController', 'submitCode', req);
             
             if (error.message === "USER_NOT_FOUND" || error.message === "PROBLEM_NOT_FOUND") {
-                return ResponseBuilder.error(res, "NOT_FOUND", error.message, 404);
+                return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.NOT_FOUND, error.message));
             }
             
-            return ResponseBuilder.error(res, "FAILURE", "Internal server error", 500);
+            return ResponseBuilder.send(res, ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG));
         }
     }
 
-
     @Get()
-    async getUserSubmissions(
+    public async getUserSubmissions(
         @Req() req: any,
         @QueryParam("page") page: number,
         @QueryParam("limit") limit: number,
@@ -65,26 +72,16 @@ export class SubmissionController {
         @Res() res: Response
     ) {
         const userId = req.user.id;
-        const serviceResponse = await submissionService.getUserSubmissions(userId, page, limit, status, topic);
-        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        }
-        else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.submissionService.getUserSubmissions(userId, page, limit, status, topic);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 
     @Get("/:submissionId")
-    async getSubmission(
+    public async getSubmission(
         @Param("submissionId") submissionId: string,
         @Res() res: Response
     ) {
-        const serviceResponse = await submissionService.getSubmissionById(submissionId);
-        if (serviceResponse.responseCode === RESPONSE_CODES.SUCCESS_HTTP_CODE) {
-            return res.status(serviceResponse.responseCode).send({ success: true, data: serviceResponse.data });
-        }
-        else {
-            return res.status(serviceResponse.responseCode).send({ success: false, data: serviceResponse.data });
-        }
+        const serviceResponse = await this.submissionService.getSubmissionById(submissionId);
+        return ResponseBuilder.send(res, serviceResponse);
     }
 }

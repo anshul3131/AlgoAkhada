@@ -1,7 +1,14 @@
+/**
+ * @author : anshul-agarwal
+ * @since : 14/10/2026, Wednesday
+ * @desc : Service for aggregating user dashboard metrics, live spectate matches, and home-screen bundle
+ * @note : To change this template use File | Settings | File and Code Templates.
+ **/
+
+import { Service, Container } from "typedi";
 import { AppDataSource } from "../../infrastructure/database/data_source";
 import { Submission } from "../entities/Submission";
 import { Match } from "../entities/Match";
-import { Problem } from "../entities/Problem";
 import { MatchStatus } from "../enums/MatchStatus";
 import { ResponseData } from "../classes/ResponseDTO";
 import { RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
@@ -10,18 +17,38 @@ import { redisCache } from "../../infrastructure/redis/RedisCache";
 import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
 import { LiveMatchDTO } from "../classes/LiveMatchesDTO";
 import { HomeScreenDTO } from "../classes/HomeScreenDTO";
-import { recentMatchService } from "./RecentMatchService";
-import { problemService } from "./ProblemService";
-import { customMatchService } from "./CustomMatchService";
+import { RecentMatchService } from "./RecentMatchService";
+import { ProblemService } from "./ProblemService";
+import { CustomMatchService } from "./CustomMatchService";
+import { ErrorLoggingUtils } from "../../utils/ErrorLoggingUtils";
+import { logger } from "../../utils/LogglyClient";
+import { cacheExpirySeconds } from "../../constants/CacheConstants";
+import { DEFAULT_RECENT_MATCHES_LIMIT } from "../../constants/AppConstant";
 
-class DashboardService {
+const LIVE_MATCHES_LIMIT = 20;
+const DEFAULT_FALLBACK_ELO = 1200;
+const ELO_APPROX_DELTA = 15;
+const RECENT_DASHBOARD_MATCHES_LIMIT = 10;
+
+@Service()
+export class DashboardService {
+    private recentMatchService: RecentMatchService;
+    private problemService: ProblemService;
+    private customMatchService: CustomMatchService;
+
+    constructor() {
+        this.recentMatchService = Container.get(RecentMatchService);
+        this.problemService = Container.get(ProblemService);
+        this.customMatchService = Container.get(CustomMatchService);
+    }
+
     public async getDashboardStats(userId: string): Promise<ResponseData> {
         try {
             // 1. Submissions Stats
             const submissionRepo = AppDataSource.getRepository(Submission);
             const submissions = await submissionRepo.find({
                 where: { user: { id: userId } },
-                select: {status : true}
+                select: { status: true }
             });
 
             const submissionStats = {
@@ -40,14 +67,14 @@ class DashboardService {
                 else submissionStats.other++;
             }
 
-            // 2. Matches Stats and 4. Elo History (Approximated from matches)
+            // 2. Matches Stats and Elo History (Approximated from matches)
             const matchRepo = AppDataSource.getRepository(Match);
             const matches = await matchRepo.find({
                 where: [
                     { user1: { id: userId }, status: MatchStatus.FINISHED },
                     { user2: { id: userId }, status: MatchStatus.FINISHED }
                 ],
-                relations: {winner : true, user1: true, user2: true, problem: true},
+                relations: { winner: true, user1: true, user2: true, problem: true },
                 order: { created_at: "DESC" }
             });
 
@@ -66,7 +93,7 @@ class DashboardService {
                     isWin: isWinner
                 });
 
-                if (recentMatches.length < 10) {
+                if (recentMatches.length < RECENT_DASHBOARD_MATCHES_LIMIT) {
                     const opponent = match.user1.id === userId ? match.user2 : match.user1;
                     recentMatches.push({
                         matchId: match.id,
@@ -88,28 +115,25 @@ class DashboardService {
             // Get current user Elo to trace backwards
             const userRepo = AppDataSource.getRepository("users");
             const user: any = await userRepo.findOne({ where: { id: userId } });
-            let currentElo = user ? user.elo_rating : 1200;
+            let currentElo = user ? user.elo_rating : DEFAULT_FALLBACK_ELO;
 
             const eloHistory = [];
-            // We push the current state
             eloHistory.push({ date: new Date(), elo: currentElo });
 
-            // Trace backwards
             for (const m of matchHistoryRaw) {
                 if (m.isWin) {
-                    currentElo -= 15; // approximate back-calculation
+                    currentElo -= ELO_APPROX_DELTA;
                 } else {
-                    currentElo += 15;
+                    currentElo += ELO_APPROX_DELTA;
                 }
                 eloHistory.push({ date: m.date, elo: currentElo });
             }
-            eloHistory.reverse(); // chronological order
+            eloHistory.reverse();
 
             // 3. Accepted Topics
-            // Get all accepted submissions with problems and tags
             const acceptedSubmissions = await submissionRepo.find({
                 where: { user: { id: userId }, status: "Accepted" as any },
-                relations: {problem : true}
+                relations: { problem: true }
             });
 
             const topicsStats: Record<string, number> = {};
@@ -120,7 +144,6 @@ class DashboardService {
                     processedProblems.add(sub.problem.id);
                     if (sub.problem.tags && Array.isArray(sub.problem.tags)) {
                         for (const tag of sub.problem.tags) {
-                            // Strip TAG_ prefix if exists
                             const niceTag = tag.replace(/^TAG_/, '').replace(/_/g, ' ').toLowerCase();
                             topicsStats[niceTag] = (topicsStats[niceTag] || 0) + 1;
                         }
@@ -145,10 +168,11 @@ class DashboardService {
             });
 
         } catch (error: any) {
-            console.error(`[DashboardService] error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'DashboardService', 'getDashboardStats', { userId });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
+
     public async getLiveMatches(): Promise<ResponseData> {
         try {
             const cacheKey = RedisKeys.getLiveMatchesKey();
@@ -158,12 +182,11 @@ class DashboardService {
                     return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
                 }
             } catch (cacheErr: any) {
-                console.warn(`[DashboardService] Redis get live matches failed, falling back to DB: ${cacheErr.message}`);
+                logger.warn(`[DashboardService] Redis get live matches failed, falling back to DB: ${cacheErr.message}`);
             }
 
-            const liveMatches = await matchRepository.getLiveMatches(20);
+            const liveMatches = await matchRepository.getLiveMatches(LIVE_MATCHES_LIMIT);
 
-            // Map to a clean DTO
             const data: LiveMatchDTO[] = liveMatches.map(m => ({
                 matchId: m.id,
                 user1: { id: m.user1?.id, username: m.user1?.username, elo: m.user1?.elo_rating },
@@ -173,18 +196,17 @@ class DashboardService {
                 createdAt: m.created_at
             }));
 
-            // Sort by combined elo rating
-            data.sort((a, b) => ((b.user1.elo || 1200) + (b.user2.elo || 1200)) - ((a.user1.elo || 1200) + (a.user2.elo || 1200)));
+            data.sort((a, b) => ((b.user1.elo || DEFAULT_FALLBACK_ELO) + (b.user2.elo || DEFAULT_FALLBACK_ELO)) - ((a.user1.elo || DEFAULT_FALLBACK_ELO) + (a.user2.elo || DEFAULT_FALLBACK_ELO)));
 
             try {
-                await redisCache.set(cacheKey, data, { EX: 10 });
+                await redisCache.set(cacheKey, data, { EX: cacheExpirySeconds.TEN_SECONDS });
             } catch (cacheErr: any) {
-                console.warn(`[DashboardService] Redis set live matches failed: ${cacheErr.message}`);
+                logger.warn(`[DashboardService] Redis set live matches failed: ${cacheErr.message}`);
             }
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
         } catch (error: any) {
-            console.error(`[DashboardService] getLiveMatches error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'DashboardService', 'getLiveMatches');
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
@@ -192,11 +214,11 @@ class DashboardService {
     public async getHomeScreenData(userId: string): Promise<ResponseData> {
         try {
             const [recentMatchesRes, userStatsRes, tagsRes, liveMatchesRes, publicLobbiesRes] = await Promise.all([
-                recentMatchService.getRecentMatches(userId, 5),
-                recentMatchService.getUserStats(userId),
-                problemService.getTags(),
+                this.recentMatchService.getRecentMatches(userId, DEFAULT_RECENT_MATCHES_LIMIT),
+                this.recentMatchService.getUserStats(userId),
+                this.problemService.getTags(),
                 this.getLiveMatches(),
-                customMatchService.getPublicLobbies()
+                this.customMatchService.getPublicLobbies()
             ]);
 
             const homeData: HomeScreenDTO = {
@@ -209,10 +231,10 @@ class DashboardService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, homeData);
         } catch (error: any) {
-            console.error(`[DashboardService] getHomeScreenData error: ${error.message}`);
+            ErrorLoggingUtils.logError(error, 'DashboardService', 'getHomeScreenData', { userId });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
 }
 
-export const dashboardService = new DashboardService();
+export const dashboardService = Container.get(DashboardService);
