@@ -64,8 +64,12 @@ export class ProblemRepository extends Repository<Problem> {
             query.andWhere(":tag = ANY(problem.tags)", { tag });
         }
 
-        // Deterministic ordering by creation date
-        query.orderBy("problem.createdAt", "DESC");
+        // Prioritize problems with non-empty tags over problems with empty or null tags
+        query.orderBy(
+            "CASE WHEN problem.tags IS NOT NULL AND cardinality(problem.tags) > 0 THEN 0 ELSE 1 END",
+            "ASC"
+        );
+        query.addOrderBy("problem.createdAt", "DESC");
 
         // Pagination
         query.skip((page - 1) * limit).take(limit);
