@@ -7,6 +7,11 @@ import { MatchStatus } from "../enums/MatchStatus";
 import { CustomParticipantStatus } from "../enums/CustomParticipantStatus";
 import { CustomMatchDTO, CustomParticipantDTO } from "../classes/CustomMatchDTO";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
+import { redisCache } from "../../infrastructure/redis/RedisCache";
+import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
+import { PublicLobbyDTO } from "../classes/PublicLobbyDTO";
+import { AppDataSource } from "../../infrastructure/database/data_source";
+import { CustomMatchParticipant } from "../entities/CustomMatchParticipant";
 
 export class CustomMatchService {
 
@@ -38,7 +43,15 @@ export class CustomMatchService {
             });
             await customMatchParticipantRepository.saveEntity(hostParticipant);
 
-            const payload = await this.getLobbyDTO(savedMatch.id);
+            if (isPublic) {
+                try {
+                    await redisCache.del(RedisKeys.getPublicLobbiesKey());
+                } catch (cacheErr: any) {
+                    console.warn(`[CustomMatchService] Failed to invalidate public lobbies: ${cacheErr.message}`);
+                }
+            }
+
+            const payload = await this.getLobbyDTO(savedMatch.id, true);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
             console.error('[CustomMatchService] createLobby error:', error.message);
@@ -60,7 +73,13 @@ export class CustomMatchService {
 
             await customMatchRepository.saveEntity(match);
 
-            const payload = await this.getLobbyDTO(matchId);
+            try {
+                await redisCache.del(RedisKeys.getPublicLobbiesKey());
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Failed to invalidate public lobbies: ${cacheErr.message}`);
+            }
+
+            const payload = await this.getLobbyDTO(matchId, true);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
             console.error('[CustomMatchService] updateLobby error:', error.message);
@@ -69,35 +88,80 @@ export class CustomMatchService {
     }
 
     public async joinLobby(matchId: string, userId: string): Promise<ResponseData> {
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
         try {
-            const match = await customMatchRepository.getMatchById(matchId);
-            if (!match) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
+            // Pessimistic write lock prevents concurrent over-filling and races with leaveLobby
+            const match = await queryRunner.manager.findOne(CustomMatch, {
+                where: { id: matchId },
+                lock: { mode: "pessimistic_write" },
+                relations: { host: true, problem: true }
+            });
+
+            if (!match) {
+                await queryRunner.rollbackTransaction();
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
+            }
+
+            // Defensive Status Checks
+            if (match.status === MatchStatus.ABORTED) {
+                await queryRunner.rollbackTransaction();
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, "This lobby has been closed by the host.");
+            }
+
+            if (match.status === MatchStatus.IN_PROGRESS || match.status === MatchStatus.FINISHED) {
+                await queryRunner.rollbackTransaction();
+                return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, "This match has already started.");
+            }
+
             const user = await userRepository.getUserById(userId);
-            if (!user) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.USER_NOT_FOUND);
+            if (!user) {
+                await queryRunner.rollbackTransaction();
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.USER_NOT_FOUND);
+            }
 
-            const existingParticipant = match.participants?.find(p => p.user.id === userId);
-            
-            if (!existingParticipant && match.status !== MatchStatus.NOT_STARTED) return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, RESPONSE_MESSAGES.MATCH_ALREADY_STARTED);
+            const participants = await queryRunner.manager.find(CustomMatchParticipant, {
+                where: { customMatch: { id: matchId } },
+                relations: { user: true }
+            });
 
-            if (!existingParticipant && match.participants && match.participants.length >= match.maxParticipants) {
+            const existingParticipant = participants.find(p => p.user.id === userId);
+
+            if (!existingParticipant && participants.length >= match.maxParticipants) {
+                await queryRunner.rollbackTransaction();
                 return ResponseData.build(RESPONSE_CODES.INVALID_INPUT, "Lobby is full");
             }
+
             if (!existingParticipant) {
-                const participant = customMatchParticipantRepository.create({
+                const participant = queryRunner.manager.create(CustomMatchParticipant, {
                     customMatch: match,
                     user,
                     status: CustomParticipantStatus.JOINED
                 });
-                await customMatchParticipantRepository.saveEntity(participant);
+                await queryRunner.manager.save(participant);
             }
 
-            const payload = await this.getLobbyDTO(matchId);
+            await queryRunner.commitTransaction();
+
+            try {
+                await redisCache.del(RedisKeys.getPublicLobbiesKey());
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Failed to invalidate public lobbies: ${cacheErr.message}`);
+            }
+
+            const payload = await this.getLobbyDTO(matchId, true);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
+            await queryRunner.rollbackTransaction();
             console.error('[CustomMatchService] joinLobby error:', error.message);
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        } finally {
+            await queryRunner.release();
         }
     }
+
     public async joinLobbyByCode(joinCode: string, userId: string): Promise<ResponseData> {
         try {
             const match = await customMatchRepository.getMatchByCode(joinCode);
@@ -110,30 +174,69 @@ export class CustomMatchService {
     }
 
     public async leaveLobby(matchId: string, userId: string): Promise<ResponseData> {
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
         try {
-            const match = await customMatchRepository.getMatchById(matchId);
-            if (!match) return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
+            // Pessimistic write lock prevents concurrent joins during room teardown
+            const match = await queryRunner.manager.findOne(CustomMatch, {
+                where: { id: matchId },
+                lock: { mode: "pessimistic_write" },
+                relations: { host: true, problem: true }
+            });
 
-            const participantToRemove = match.participants?.find(p => p.user.id === userId);
+            if (!match) {
+                await queryRunner.rollbackTransaction();
+                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.LOBBY_NOT_FOUND);
+            }
+
+            const participants = await queryRunner.manager.find(CustomMatchParticipant, {
+                where: { customMatch: { id: matchId } },
+                relations: { user: true }
+            });
+
+            const participantToRemove = participants.find(p => p.user.id === userId);
             if (participantToRemove) {
-                await customMatchParticipantRepository.delete(participantToRemove.id);
+                await queryRunner.manager.delete(CustomMatchParticipant, participantToRemove.id);
             }
 
-            match.participants = match.participants?.filter(p => p.user.id !== userId);
+            const remainingParticipants = participants.filter(p => p.user.id !== userId);
 
-            if (match.host?.id === userId && match.participants && match.participants.length > 0) {
-                match.host = match.participants[0]!.user;
-                await customMatchRepository.saveEntity(match);
-            } else if (match.participants?.length === 0) {
+            let isAborted = false;
+            if (match.host?.id === userId && remainingParticipants.length > 0) {
+                match.host = remainingParticipants[0]!.user;
+                await queryRunner.manager.save(match);
+            } else if (remainingParticipants.length === 0) {
                 match.status = MatchStatus.ABORTED;
-                await customMatchRepository.saveEntity(match);
+                await queryRunner.manager.save(match);
+                isAborted = true;
             }
 
-            const payload = await this.getLobbyDTO(matchId);
+            await queryRunner.commitTransaction();
+
+            try {
+                await redisCache.del(RedisKeys.getPublicLobbiesKey());
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Failed to invalidate public lobbies: ${cacheErr.message}`);
+            }
+
+            if (isAborted) {
+                try {
+                    await redisCache.del(RedisKeys.getCustomLobbyKey(matchId));
+                } catch (cacheErr: any) {
+                    console.warn(`[CustomMatchService] Failed to delete custom lobby cache: ${cacheErr.message}`);
+                }
+            }
+
+            const payload = await this.getLobbyDTO(matchId, true);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            await queryRunner.rollbackTransaction();
+            console.error('[CustomMatchService] leaveLobby error:', error.message);
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        } finally {
+            await queryRunner.release();
         }
     }
 
@@ -146,6 +249,7 @@ export class CustomMatchService {
             if (participant) {
                 participant.status = CustomParticipantStatus.FORFEITED;
                 await customMatchParticipantRepository.saveEntity(participant);
+                await this.getLobbyDTO(matchId, true);
             }
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, null);
@@ -171,7 +275,13 @@ export class CustomMatchService {
             match.startedAt = new Date();
             await customMatchRepository.saveEntity(match);
 
-            const payload = await this.getLobbyDTO(matchId);
+            try {
+                await redisCache.del(RedisKeys.getPublicLobbiesKey());
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Failed to invalidate public lobbies: ${cacheErr.message}`);
+            }
+
+            const payload = await this.getLobbyDTO(matchId, true);
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payload);
         } catch (error: any) {
             console.error('[CustomMatchService] startMatch error:', error.message);
@@ -181,19 +291,24 @@ export class CustomMatchService {
 
     public async getPublicLobbies(): Promise<ResponseData> {
         try {
-            const matches = await customMatchRepository.getPublicLobbies();
-            const payloads = matches.map(match => ({
-                id: match.id,
-                hostId: match.host?.id,
-                hostUsername: match.host?.username,
-                timeLimit: match.timeLimit,
-                maxParticipants: match.maxParticipants,
-                joinCode: match.joinCode,
-                topic: match.topic,
-                name: match.name,
-                difficulty: match.difficulty,
-                participantCount: match.participants?.length || 0
-            }));
+            const cacheKey = RedisKeys.getPublicLobbiesKey();
+            try {
+                const cached = await redisCache.get<PublicLobbyDTO[]>(cacheKey);
+                if (cached) {
+                    return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
+                }
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Redis get public lobbies failed: ${cacheErr.message}`);
+            }
+
+            const payloads = await customMatchRepository.getPublicLobbies();
+
+            try {
+                await redisCache.set(cacheKey, payloads, { EX: 10 });
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Redis set public lobbies failed: ${cacheErr.message}`);
+            }
+
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, payloads);
         } catch (error: any) {
             console.error('[CustomMatchService] getPublicLobbies error:', error.message);
@@ -201,11 +316,23 @@ export class CustomMatchService {
         }
     }
 
-    public async getLobbyDTO(matchId: string): Promise<CustomMatchDTO | null> {
+    public async getLobbyDTO(matchId: string, skipCache: boolean = false): Promise<CustomMatchDTO | null> {
+        const cacheKey = RedisKeys.getCustomLobbyKey(matchId);
+        if (!skipCache) {
+            try {
+                const cached = await redisCache.get<CustomMatchDTO>(cacheKey);
+                if (cached) {
+                    return cached;
+                }
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Redis get lobby failed: ${cacheErr.message}`);
+            }
+        }
+
         const match = await customMatchRepository.getMatchById(matchId);
         if (!match) return null;
 
-        return {
+        const dto: CustomMatchDTO = {
             id: match.id,
             hostId: match.host?.id,
             problemId: match.problem?.id,
@@ -225,6 +352,22 @@ export class CustomMatchService {
                 score: p.score
             }))
         } as CustomMatchDTO;
+
+        if (match.status === MatchStatus.NOT_STARTED || match.status === MatchStatus.IN_PROGRESS) {
+            try {
+                await redisCache.set(cacheKey, dto, { EX: 600 });
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Redis set lobby failed: ${cacheErr.message}`);
+            }
+        } else {
+            try {
+                await redisCache.del(cacheKey);
+            } catch (cacheErr: any) {
+                console.warn(`[CustomMatchService] Redis del lobby failed: ${cacheErr.message}`);
+            }
+        }
+
+        return dto;
     }
 }
 

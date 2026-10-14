@@ -1,10 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany, Index } from "typeorm";
 import { User } from "./User";
 import { Problem } from "./Problem";
 import { MatchStatus } from "../enums/MatchStatus";
 import { CustomMatchParticipant } from "./CustomMatchParticipant";
 
 @Entity("custom_matches")
+@Index("idx_custom_matches_public_not_started", ["created_at"], { where: `"isPublic" = true AND "status" = 'NOT_STARTED'` })
 export class CustomMatch {
     @PrimaryGeneratedColumn("uuid")
     id: string;

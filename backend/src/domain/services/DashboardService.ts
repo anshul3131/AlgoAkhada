@@ -173,7 +173,7 @@ class DashboardService {
             data.sort((a, b) => ((b.user1.elo || 1200) + (b.user2.elo || 1200)) - ((a.user1.elo || 1200) + (a.user2.elo || 1200)));
 
             try {
-                await redisCache.set(cacheKey, data, { EX: 60 });
+                await redisCache.set(cacheKey, data, { EX: 10 });
             } catch (cacheErr: any) {
                 console.warn(`[DashboardService] Redis set live matches failed: ${cacheErr.message}`);
             }

@@ -59,4 +59,20 @@ export class RedisKeys {
     public static getLiveMatchesKey(): string {
         return `live_matches`;
     }
+
+    /**
+     * Key for cached active public custom lobbies
+     * Example: public_lobbies
+     */
+    public static getPublicLobbiesKey(): string {
+        return `public_lobbies`;
+    }
+
+    /**
+     * Key for cached custom match lobby room state
+     * Example: custom_lobby:uuid
+     */
+    public static getCustomLobbyKey(matchId: string): string {
+        return `custom_lobby:${matchId}`;
+    }
 }

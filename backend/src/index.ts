@@ -164,7 +164,12 @@ async function startServer(): Promise<void> {
             socket.on('subscribeToSubmission', handleSubmissionSub);
             socket.on('subscribe_submission', handleSubmissionSub);
 
-            socket.on('join_match', (matchId: string) => {
+            socket.on('join_match', async (matchId: string) => {
+                const match = await matchRepository.findOne({ where: { id: matchId } });
+                if (!match || match.status !== MatchStatus.IN_PROGRESS) {
+                    socket.emit('match_error', { message: 'This match is no longer in progress.' });
+                    return;
+                }
                 const matchRoom = `match:${matchId}`;
                 socket.join(matchRoom);
                 console.log(`Socket ${socket.id} joined match room: ${matchRoom}`);
