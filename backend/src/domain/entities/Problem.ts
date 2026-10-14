@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, Index } from "typeorm";
 import { TestCase } from "./TestCase";
 import { Submission } from "./Submission";
 import { ProblemTag } from "../enums/ProblemTag";
@@ -11,6 +11,7 @@ export enum ProblemDifficulty {
 }
 
 @Entity("problems")
+@Index("idx_problems_difficulty_created", ["difficulty", "createdAt"])
 export class Problem {
     @PrimaryGeneratedColumn("uuid")
     id: string;

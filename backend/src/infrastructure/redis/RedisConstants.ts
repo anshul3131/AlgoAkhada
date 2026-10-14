@@ -90,4 +90,12 @@ export class RedisKeys {
     public static getProblemTagsKey(): string {
         return `problem_tags`;
     }
+
+    /**
+     * Key for cached static problem details (statement, difficulty, tags, samples)
+     * Example: problem:details:uuid
+     */
+    public static getProblemDetailsKey(problemId: string): string {
+        return `problem:details:${problemId}`;
+    }
 }

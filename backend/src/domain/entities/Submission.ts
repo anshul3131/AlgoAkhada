@@ -18,6 +18,8 @@ export enum SubmissionStatus {
 
 @Entity("submissions")
 @Index('index_submission_status',['status'])
+@Index('idx_submissions_user_problem_status_date', ['user', 'problem', 'status', 'submittedAt'])
+@Index('idx_submissions_user_date', ['user', 'submittedAt'])
 export class Submission {
     @PrimaryGeneratedColumn("uuid")
     id: string;

@@ -27,8 +27,26 @@ export class ProblemRepository extends Repository<Problem> {
         return await this.findOne({ where: { id }, relations: { testCases: true } });
     }
 
+    async getProblemWithSamples(id: string): Promise<Problem | null> {
+        return await this.createQueryBuilder("problem")
+            .leftJoinAndSelect("problem.testCases", "testCase", "testCase.isHidden = false")
+            .where("problem.id = :id", { id })
+            .getOne();
+    }
+
     async getAllProblems(page: number, limit: number, difficulty: string, search?: string, tag?: string) {
         const query = this.createQueryBuilder("problem");
+
+        // Projection Pruning: select only lightweight columns needed for list view, omitting large problem.description
+        query.select([
+            "problem.id",
+            "problem.title",
+            "problem.difficulty",
+            "problem.tags",
+            "problem.timeLimit",
+            "problem.memoryLimit",
+            "problem.createdAt"
+        ]);
 
         // Format difficulty to match Enum (e.g., 'medium' -> 'Medium')
         if (difficulty) {
@@ -36,15 +54,18 @@ export class ProblemRepository extends Repository<Problem> {
             query.andWhere("problem.difficulty = :difficulty", { difficulty: normalizedDifficulty });
         }
 
-        // Search by prefix if provided
+        // Search by prefix if provided (case-insensitive prefix search utilizing index)
         if (search) {
-            query.andWhere("problem.title ILIKE :search", { search: `${search}%` });
+            query.andWhere("lower(problem.title) LIKE :search", { search: `${search.toLowerCase()}%` });
         }
 
         // Filter by specific tag if provided
         if (tag) {
             query.andWhere(":tag = ANY(problem.tags)", { tag });
         }
+
+        // Deterministic ordering by creation date
+        query.orderBy("problem.createdAt", "DESC");
 
         // Pagination
         query.skip((page - 1) * limit).take(limit);

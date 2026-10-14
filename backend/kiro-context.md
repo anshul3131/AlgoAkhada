@@ -114,3 +114,21 @@ Magic numbers, hardcoded strings, TTLs, and configuration keys must be defined i
 ## 8. Database & Concurrency Rules
 - **Pessimistic Locking**: When locking a record for concurrency (e.g. `pessimistic_write` / `SELECT ... FOR UPDATE`), **never** join outer/nullable relations in the same query (`FOR UPDATE cannot be applied to the nullable side of an outer join`). Lock the target entity first in an isolated query, then load related entities under the active transaction.
 - **Transactions**: For multi-table atomic updates (e.g. lobby join/leave, match creation, submission grading), always use `queryRunner.startTransaction()` and pass `queryRunner` to repository methods.
+
+---
+
+## 9. Problem Caching & Query Indexing Standards
+- **Problem Details Cache-Aside**:
+  - `getProblemDetails(id)` uses Redis key `problem:details:<id>` (`SEVEN_DAYS` TTL).
+  - Only public example test cases (`!tc.isHidden`) are joined via `getProblemWithSamples`, preventing large hidden test cases from transferring into Node.js memory.
+  - Markdown / Codeforces formatting is pre-calculated once and cached.
+- **Problem List Projection Pruning**:
+  - `getAllProblems` selects only lightweight columns (`id`, `title`, `difficulty`, `tags`, `timeLimit`, `memoryLimit`, `createdAt`), omitting the large `description` column.
+  - User `isSolved` checks are strictly scoped to the current page problem IDs: `where: { problem: { id: In(pageProblemIds) } }`.
+- **Database Indexes**:
+  - `idx_problems_tags_gin`: PostgreSQL GIN index on `tags` (`text[]`) for fast `ANY(tags)` array lookups.
+  - `idx_problems_difficulty_created`: Composite index on `(difficulty, "createdAt" DESC)` for pre-sorted pagination.
+  - `idx_problems_title_lower`: `lower(title) varchar_pattern_ops` B-Tree index for fast prefix searching.
+  - `idx_submissions_user_problem_status_date`: Composite index on `(user_id, problem_id, status, "submittedAt" DESC)` covering `pastSubmissions`, `getLastAcceptedSubmission`, and `isSolved`.
+  - `idx_submissions_user_date`: Composite index on `(user_id, "submittedAt" DESC)` for instant global submission history pagination.
+

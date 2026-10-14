@@ -11,6 +11,7 @@ import { Problem, ProblemDifficulty } from "../entities/Problem";
 import { ProblemRepository, problemRepository } from "../../infrastructure/database/repositories/ProblemRepository";
 import { SubmissionRepository, submissionRepository } from "../../infrastructure/database/repositories/SubmissionRepository";
 import { AppDataSource } from "../../infrastructure/database/data_source";
+import { In } from "typeorm";
 import { TestCase } from "../entities/TestCase";
 import { ProblemTag } from "../enums/ProblemTag";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
@@ -88,10 +89,19 @@ export class ProblemService {
             const result = await this.problemRepository.getAllProblems(pageNum, limitNum, difficulty, search, tag);
             
             let solvedProblemIds = new Set<string>();
-            if (userId) {
+            if (userId && result.problems.length > 0) {
+                const pageProblemIds = result.problems.map(p => p.id);
                 const subRepo = AppDataSource.getRepository(Submission);
                 const solvedSubs = await subRepo.find({
-                    where: { user: { id: userId }, status: SubmissionStatus.ACCEPTED },
+                    where: { 
+                        user: { id: userId }, 
+                        status: SubmissionStatus.ACCEPTED,
+                        problem: { id: In(pageProblemIds) }
+                    },
+                    select: { 
+                        id: true,
+                        problem: { id: true }
+                    },
                     relations: { problem: true }
                 });
                 solvedProblemIds = new Set(solvedSubs.map(s => s.problem.id));
@@ -121,31 +131,49 @@ export class ProblemService {
 
     public async getProblemDetails(id: string, userId?: string): Promise<ResponseData> {
         try {
-            const problem = await this.problemRepository.getProblemById(id);
-            if (!problem) {
-                return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND);
+            const cacheKey = RedisKeys.getProblemDetailsKey(id);
+            let staticPayload: ProblemDetailDTO | null = null;
+
+            try {
+                staticPayload = await redisCache.get<ProblemDetailDTO>(cacheKey);
+            } catch (cacheErr: any) {
+                logger.warn(`Redis getProblemDetails cache lookup failed for ${id}: ${cacheErr.message}`);
             }
 
-            const samples: ProblemSampleDTO[] = (problem.testCases || [])
-                .filter(tc => !tc.isHidden)
-                .map(tc => ({
-                    id: tc.id,
-                    name: tc.name || "Example",
-                    input: tc.input,
-                    output: tc.expectedOutput,
-                    explanation: tc.explanation || ""
-                }));
+            if (!staticPayload) {
+                const problem = await this.problemRepository.getProblemWithSamples(id);
+                if (!problem) {
+                    return ResponseData.build(RESPONSE_CODES.NOT_FOUND, RESPONSE_MESSAGES.NOT_FOUND);
+                }
 
-            const payload: ProblemDetailDTO = {
-                id: problem.id,
-                title: problem.title,
-                description: ProblemFormatter.formatCodeforces(problem.description),
-                timeLimit: problem.timeLimit,
-                memoryLimit: problem.memoryLimit,
-                difficulty: problem.difficulty,
-                tags: problem.tags || [],
-                samples: samples
-            };
+                const samples: ProblemSampleDTO[] = (problem.testCases || [])
+                    .map(tc => ({
+                        id: tc.id,
+                        name: tc.name || "Example",
+                        input: tc.input,
+                        output: tc.expectedOutput,
+                        explanation: tc.explanation || ""
+                    }));
+
+                staticPayload = {
+                    id: problem.id,
+                    title: problem.title,
+                    description: ProblemFormatter.formatCodeforces(problem.description),
+                    timeLimit: problem.timeLimit,
+                    memoryLimit: problem.memoryLimit,
+                    difficulty: problem.difficulty,
+                    tags: problem.tags || [],
+                    samples: samples
+                };
+
+                try {
+                    await redisCache.set(cacheKey, staticPayload, { EX: cacheExpirySeconds.SEVEN_DAYS });
+                } catch (cacheSetErr: any) {
+                    logger.warn(`Redis setProblemDetails cache set failed for ${id}: ${cacheSetErr.message}`);
+                }
+            }
+
+            const payload: ProblemDetailDTO = { ...staticPayload };
 
             if (userId) {
                 const subRepo = AppDataSource.getRepository(Submission);
