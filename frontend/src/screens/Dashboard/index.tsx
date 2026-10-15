@@ -76,13 +76,15 @@ export function DashboardScreen({ onBack, username, onUpsolve }: Props) {
       {/* Top Navbar */}
       <div className="mb-8 flex items-center justify-between border-b border-border-hairline pb-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex gap-2 items-baseline">
+          <h1 className="text-2xl font-extrabold text-text-primary tracking-tight flex gap-2 items-baseline">
             Profile <span className="text-sm font-normal text-text-secondary">/ {username}</span>
           </h1>
         </div>
-        <Button variant="ghost" onClick={onBack}>
-          Back
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={onBack}>
+            Back
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-4">
@@ -174,7 +176,7 @@ export function DashboardScreen({ onBack, username, onUpsolve }: Props) {
                            <td className="py-3 px-2 truncate max-w-[200px]" title={m.problem.title}>
                              <button 
                                onClick={() => onUpsolve(m.problem.id)} 
-                               className="text-accent-primary hover:text-white hover:underline transition-colors text-left truncate w-full"
+                               className="text-accent-primary hover:text-accent-strong hover:underline transition-colors text-left truncate w-full"
                              >
                                {m.problem.title}
                              </button>

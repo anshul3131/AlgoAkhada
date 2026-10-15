@@ -14,6 +14,7 @@ import { useAuth } from './hooks/useAuth';
 import { RealtimeProvider, useRealtimeEvent, useSocket } from './providers/RealtimeProvider';
 import { CustomLobbyScreen } from './screens/CustomLobby';
 import { TopNav } from "./components/shared/TopNav";
+import { Button } from "./components/shared/Button";
 
 import { DashboardScreen } from './screens/Dashboard';
 import { CustomBattleground } from './screens/CustomBattleground';
@@ -299,18 +300,20 @@ function ArenaShell({ user, logout }: { user: AuthUser; logout: () => void }) {
               <strong className="text-accent-primary">{inviteModal.inviterUsername}</strong> has invited you to a custom match!
             </p>
             <div className="flex justify-center gap-3">
-              <button 
-                className="px-4 py-2 rounded uppercase text-[10px] tracking-wider text-text-secondary hover:text-white transition"
+              <Button 
+                variant="ghost"
+                className="!px-4 !py-2 !text-[10px] tracking-wider"
                 onClick={handleDeclineInvite}
               >
                 Decline
-              </button>
-              <button 
-                className="px-6 py-2 rounded bg-accent-primary text-bg-void font-medium uppercase text-[10px] tracking-wider hover:bg-opacity-90 transition"
+              </Button>
+              <Button 
+                variant="primary"
+                className="!px-6 !py-2 !text-[10px] tracking-wider"
                 onClick={handleAcceptInvite}
               >
                 Accept & Join
-              </button>
+              </Button>
             </div>
           </div>
         </div>

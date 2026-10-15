@@ -145,7 +145,7 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
             <button 
               key={problem.id} 
               onClick={() => onSolveProblem(problem.id)}
-              className="flex w-full flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur text-left transition-all hover:border-accent-primary/50 hover:bg-accent-primary/5 group"
+              className="flex w-full flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between rounded-xl border border-border-subtle bg-bg-panel shadow-sm text-left transition-all hover:border-accent-primary/50 hover:bg-bg-hover group"
             >
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -157,7 +157,7 @@ export function TagExplorerScreen({ onBackToLobby, onSolveProblem, onFindMatch, 
                       </svg>
                     )}
                   </h2>
-                  <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'primary' : problem.difficulty === 'Hard' ? 'danger' : 'electric'} />
+                  <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'easy' : problem.difficulty === 'Hard' ? 'danger' : 'warn'} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">

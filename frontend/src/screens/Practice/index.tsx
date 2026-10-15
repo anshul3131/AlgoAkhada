@@ -7,7 +7,6 @@ import { useRealtimeContext, useRealtimeEvent } from '../../providers/RealtimePr
 import { problemApi, submissionApi, executionApi, type ProblemRecord, type LanguageRecord } from '../../lib/api';
 import { CodeWorkspace } from '../../components/workspace/CodeWorkspace';
 import { SplitLayout } from '../../components/shared/SplitLayout';
-import { ThemeToggle } from '../../components/shared/ThemeToggle';
 
 export function PracticeScreen({
   userId,
@@ -125,14 +124,13 @@ export function PracticeScreen({
           {mode === 'upsolve' && problem?.pastSubmissions && problem.pastSubmissions.length > 0 && (
             <button 
               onClick={() => setShowSubmissionsModal(true)}
-              className="text-[10px] uppercase tracking-[0.18em] text-accent-primary hover:text-white transition-colors border border-accent-primary/50 hover:border-accent-primary rounded px-3 py-1"
+              className="text-[10px] uppercase tracking-[0.18em] text-accent-strong dark:text-accent-primary hover:bg-accent-primary/20 transition-colors border border-accent-primary/50 hover:border-accent-primary rounded px-3 py-1"
             >
               Past Submissions ({problem.pastSubmissions.length})
             </button>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <Button variant="ghost" onClick={onBack}>Back</Button>
         </div>
       </GlowPanel>
@@ -144,7 +142,7 @@ export function PracticeScreen({
               <h2 className="text-xl font-medium tracking-[0.1em] text-text-primary uppercase font-mono">
                 Past Submissions
               </h2>
-              <button onClick={() => setShowSubmissionsModal(false)} className="text-text-secondary hover:text-white font-bold text-xl">&times;</button>
+              <button onClick={() => setShowSubmissionsModal(false)} className="text-text-secondary hover:text-text-primary font-bold text-xl">&times;</button>
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-3">
@@ -187,7 +185,7 @@ export function PracticeScreen({
           <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Practice problem</span>
-              <Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" />
+              <Badge label={problem?.difficulty ?? 'MEDIUM'} />
             </div>
 
             <div>

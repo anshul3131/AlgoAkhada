@@ -6,6 +6,7 @@ import { submissionApi } from '../../lib/api';
 import type { SubmissionDetailRecord } from '../../types';
 import Editor from '@monaco-editor/react';
 import { useTheme } from '../../hooks/useTheme';
+import { registerThemes, editorOptions } from '../../utils/monacoThemes';
 
 export function RecentSolutionScreen({
   submissionId,
@@ -96,15 +97,12 @@ export function RecentSolutionScreen({
               <Editor
                 height="100%"
                 language={submission.language === 'python' ? 'python' : submission.language === 'cpp' ? 'cpp' : 'java'}
-                theme={isDark ? 'vs-dark' : 'vs'}
+                beforeMount={registerThemes}
+                theme={isDark ? 'algo-dark' : 'algo-light'}
                 value={submission.code}
                 options={{
+                  ...editorOptions,
                   readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 14,
-                  padding: { top: 16, bottom: 16 },
-                  fontFamily: '"JetBrains Mono", "Fira Code", monospace',
                 }}
               />
             </div>

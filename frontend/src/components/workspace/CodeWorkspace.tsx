@@ -1,8 +1,7 @@
-import { Sun, Moon } from "lucide-react";
-
 import { useState, useRef, useEffect } from 'react';
-import Editor, { type Monaco } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { useTheme } from '../../hooks/useTheme';
+import { registerThemes, editorOptions } from '../../utils/monacoThemes';
 import js_beautify from 'js-beautify';
 import { Badge } from '../shared/Badge';
 import { Button } from '../shared/Button';
@@ -90,31 +89,6 @@ export function CodeWorkspace({
 
   const { isDark } = useTheme();
 
-  const defineThemes = (monaco: Monaco) => {
-    monaco.editor.defineTheme('algo-dark', {
-      base: 'vs-dark', inherit: true, rules: [],
-      colors: {
-        'editor.background': '#13131A',
-        'editorGutter.background': '#13131A',
-        'editor.lineHighlightBackground': '#1B1B25',
-        'editorLineNumber.foreground': '#4A4A5C',
-        'editorCursor.foreground': '#00FF9C',
-        'editor.selectionBackground': '#00FF9C30',
-      },
-    });
-    monaco.editor.defineTheme('algo-light', {
-      base: 'vs', inherit: true, rules: [],
-      colors: {
-        'editor.background': '#FFFFFF',
-        'editorGutter.background': '#FFFFFF',
-        'editor.lineHighlightBackground': '#F6F8FA',
-        'editorLineNumber.foreground': '#8C959F',
-        'editorCursor.foreground': '#059669',
-        'editor.selectionBackground': '#05966928',
-      },
-    });
-  };
-
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
   };
@@ -193,20 +167,13 @@ export function CodeWorkspace({
       <GlowPanel className="p-0 overflow-hidden min-h-[390px] border border-border-hairline">
           <Editor
             height="400px"
-            beforeMount={defineThemes}
+            beforeMount={registerThemes}
             theme={isDark ? 'algo-dark' : 'algo-light'}
             language={monacoLanguage}
             value={code}
             onChange={(val) => setCode(val || '')}
             onMount={handleEditorDidMount}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 14,
-              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-              fontLigatures: true,
-              padding: { top: 16 },
-              scrollBeyondLastLine: false,
-            }}
+            options={editorOptions}
           />
       </GlowPanel>
       
@@ -237,7 +204,7 @@ export function CodeWorkspace({
                     <div key={sample.id} className="rounded-lg border border-border-hairline p-3">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-text-primary">Sample {i + 1}</span>
-                          <button className="text-xs text-accent-electric hover:text-white" onClick={() => navigator.clipboard.writeText(sample.input)}>Copy Input</button>
+                          <button className="text-xs text-accent-electric hover:text-text-primary transition-colors" onClick={() => navigator.clipboard.writeText(sample.input)}>Copy Input</button>
                         </div>
                         <div className="bg-bg-elevated transition-colors duration-300 p-2 rounded mb-2 overflow-x-auto"><pre>{sample.input}</pre></div>
                         <span className="text-text-primary text-xs">Expected Output</span>

@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChartWrapper } from './ChartWrapper';
+import { useTheme } from '../../../hooks/useTheme';
 
 interface Props {
   stats: Record<string, number>;
@@ -12,6 +13,7 @@ const generateColors = (count: number) => {
 };
 
 export function TopicsPieChart({ stats }: Props) {
+  const { isDark } = useTheme();
   // Sort and take top 8 topics to avoid clutter, put rest in "Other"
   const sortedEntries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
   const topEntries = sortedEntries.slice(0, 7);
@@ -54,8 +56,13 @@ export function TopicsPieChart({ stats }: Props) {
           </Pie>
           <Legend verticalAlign="bottom" height={36} iconType="circle" />
           <Tooltip 
-            contentStyle={{ backgroundColor: '#111318', borderColor: '#1f232b', borderRadius: '8px' }}
-            itemStyle={{ color: '#e2e8f0' }}
+            contentStyle={{
+              backgroundColor: isDark ? '#111318' : '#ffffff',
+              borderColor: isDark ? '#1f232b' : '#e2e8f0',
+              borderRadius: '8px',
+              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 4px 12px rgba(0,0,0,0.08)'
+            }}
+            itemStyle={{ color: isDark ? '#e2e8f0' : '#1f2328' }}
             formatter={(value: any, name: any) => [value, String(name).charAt(0).toUpperCase() + String(name).slice(1)]}
           />
         </PieChart>

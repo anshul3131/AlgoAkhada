@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChartWrapper } from './ChartWrapper';
+import { useTheme } from '../../../hooks/useTheme';
 
 interface Props {
   stats: {
@@ -8,9 +9,10 @@ interface Props {
   };
 }
 
-const COLORS = ['#3b82f6', '#ef4444'];
-
 export function MatchesPieChart({ stats }: Props) {
+  const { isDark } = useTheme();
+  const winColor = isDark ? '#00FF9C' : '#059669';
+  const COLORS = [winColor, '#ef4444'];
   const data = [
     { name: 'Wins', value: stats.wins },
     { name: 'Losses', value: stats.losses },
@@ -45,8 +47,13 @@ export function MatchesPieChart({ stats }: Props) {
             ))}
           </Pie>
           <Tooltip 
-            contentStyle={{ backgroundColor: '#111318', borderColor: '#1f232b', borderRadius: '8px' }}
-            itemStyle={{ color: '#e2e8f0' }}
+            contentStyle={{
+              backgroundColor: isDark ? '#111318' : '#ffffff',
+              borderColor: isDark ? '#1f232b' : '#e2e8f0',
+              borderRadius: '8px',
+              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 4px 12px rgba(0,0,0,0.08)'
+            }}
+            itemStyle={{ color: isDark ? '#e2e8f0' : '#1f2328' }}
           />
           <Legend verticalAlign="bottom" height={36} iconType="circle" />
         </PieChart>

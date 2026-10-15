@@ -140,7 +140,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setShowLeaderboardModal(true)}
-            className="rounded border border-border-hairline bg-bg-surface px-4 py-2 text-xs font-bold uppercase tracking-widest text-text-primary transition-colors hover:border-accent-primary hover:text-accent-primary"
+            className="rounded border border-border-hairline bg-bg-panel px-4 py-2 text-xs font-bold uppercase tracking-widest text-text-primary transition-colors hover:border-accent-primary hover:text-accent-primary"
           >
             Live Rankings
           </button>
@@ -148,7 +148,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
           {hasAccepted ? (
             <button 
               onClick={handleExitMatch}
-              className="rounded bg-accent-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-primary transition-colors hover:bg-accent-primary hover:text-white"
+              className="rounded border border-accent-primary/40 bg-accent-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-strong dark:text-accent-primary transition-colors hover:bg-accent-primary/25 hover:border-accent-primary"
             >
               Home
             </button>
@@ -159,7 +159,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
                   handleExitMatch();
                 }
               }}
-              className="rounded bg-accent-danger/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-danger transition-colors hover:bg-accent-danger hover:text-white"
+              className="rounded border border-accent-danger/40 bg-accent-danger/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-danger transition-colors hover:bg-accent-danger/25 hover:border-accent-danger"
             >
               Forfeit Match
             </button>
@@ -170,7 +170,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
         <SplitLayout
         left={
           <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
-            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
+            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} /></div>
             <div>
               <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
               <div data-problem-statement className="problem-statement-content mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>
@@ -234,7 +234,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
               {leaderboard.map((user: any, idx: number) => {
                  const isWinner = idx === 0 && user.score > 0;
                  return (
-                   <div key={user.userId} className={`flex justify-between items-center rounded-lg border p-4 ${isWinner ? 'border-accent-primary bg-accent-primary/5' : 'border-border-subtle bg-bg-surface'}`}>
+                   <div key={user.userId} className={`flex justify-between items-center rounded-lg border p-4 ${isWinner ? 'border-accent-primary bg-accent-primary/5' : 'border-border-subtle bg-bg-panel'}`}>
                      <div className="flex items-center gap-4">
                        <span className={`font-mono text-xl ${isWinner ? 'text-accent-primary' : 'text-text-secondary'} w-6 text-center`}>{idx + 1}</span>
                        <div className="flex flex-col">
@@ -271,7 +271,7 @@ export function CustomBattleground({ userId, lobbyId, problemId, onFinished, onL
               {matchResultModal.map((user: any, idx: number) => {
                  const isWinner = idx === 0 && user.score > 0;
                  return (
-                   <div key={user.userId} className={`flex justify-between items-center rounded-lg border p-4 ${isWinner ? 'border-accent-primary bg-accent-primary/5' : 'border-border-subtle bg-bg-surface'}`}>
+                   <div key={user.userId} className={`flex justify-between items-center rounded-lg border p-4 ${isWinner ? 'border-accent-primary bg-accent-primary/5' : 'border-border-subtle bg-bg-panel'}`}>
                      <div className="flex items-center gap-4">
                        <span className={`font-mono text-xl ${isWinner ? 'text-accent-primary' : 'text-text-secondary'} w-6 text-center`}>{idx + 1}</span>
                        <span className="font-mono text-lg text-text-primary">{user.username || user.userId.slice(0, 8)}</span>

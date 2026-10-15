@@ -109,7 +109,7 @@ export function Battleground({ userId, matchId, problemId, onFinished, startTime
                 forfeitMatch(matchId);
               }
             }}
-            className="rounded bg-accent-danger/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-danger transition-colors hover:bg-accent-danger hover:text-white"
+            className="rounded border border-accent-danger/40 bg-accent-danger/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-accent-danger transition-colors hover:bg-accent-danger/25 hover:border-accent-danger"
           >
             Forfeit Match
           </button>
@@ -120,7 +120,7 @@ export function Battleground({ userId, matchId, problemId, onFinished, startTime
         <SplitLayout
         left={
           <GlowPanel className="space-y-5 h-full xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto">
-            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} tone="electric" /></div>
+            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-[0.2em] text-text-secondary">Assigned problem</span><Badge label={problem?.difficulty ?? 'MEDIUM'} /></div>
             <div>
               <h1 className="text-2xl font-semibold text-text-primary">{problem?.title ?? 'Loading problem...'}</h1>
               <div data-problem-statement className="problem-statement-content mt-4 text-sm leading-7 text-text-primary" dangerouslySetInnerHTML={{ __html: problem?.description ?? 'Fetching the problem assigned to this match.' }}></div>

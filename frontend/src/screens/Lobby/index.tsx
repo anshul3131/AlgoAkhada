@@ -258,7 +258,7 @@ export function LobbyDashboard({
                           onUpsolve(match.problemId);
                         }
                       }}
-                      className="text-[11px] text-left uppercase tracking-[0.1em] text-text-secondary hover:text-white hover:underline truncate"
+                      className="text-[11px] text-left uppercase tracking-[0.1em] text-text-secondary hover:text-text-primary hover:underline transition-colors truncate"
                       title={match.problemTitle}
                     >
                       {match.problemTitle}

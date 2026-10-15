@@ -15,9 +15,9 @@ interface ProblemsScreenProps {
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
 
 const DIFFICULTY_DOT: Record<Difficulty, string> = {
-  Easy: 'bg-accent-primary',
-  Medium: 'bg-sky-400',
-  Hard: 'bg-red-500',
+  Easy: 'bg-easy',
+  Medium: 'bg-medium',
+  Hard: 'bg-hard',
 };
 
 export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
@@ -113,7 +113,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
         {/* ── Filters (left sidebar, sticky on desktop) ── */}
         <aside
           aria-label="Filters"
-          className="w-full shrink-0 space-y-6 rounded-xl border border-white/10 bg-zinc-900/60 p-4 backdrop-blur lg:sticky lg:top-6 lg:w-72"
+          className="w-full shrink-0 space-y-6 rounded-xl border border-border-subtle bg-bg-panel p-4 shadow-panel backdrop-blur lg:sticky lg:top-6 lg:w-72"
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-text-primary">Filters</h2>
@@ -155,7 +155,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                     className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-sm transition-colors ${focusRing} ${
                       active
                         ? 'border-accent-primary/60 bg-accent-primary/10 text-text-primary'
-                        : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-white/20 hover:text-text-primary'
+                        : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-border-strong hover:text-text-primary'
                     }`}
                   >
                     <span className="flex items-center gap-1.5">
@@ -273,7 +273,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                           </svg>
                         )}
                       </h2>
-                      <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'primary' : problem.difficulty === 'Hard' ? 'danger' : 'electric'} />
+                      <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'easy' : problem.difficulty === 'Hard' ? 'danger' : 'warn'} />
                     </div>
                     {!hideTags && (
                     <div className="flex flex-wrap gap-2">
@@ -294,11 +294,11 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
               ))}
             </div>
             {true && (
-                <div className="mt-6 flex items-center justify-between rounded-xl border border-white/5 bg-bg-panel-raised px-4 py-3">
+                <div className="mt-6 flex items-center justify-between rounded-xl border border-border-subtle bg-bg-panel-raised px-4 py-3">
                   <button 
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition"
                   >
                     Previous
                   </button>
@@ -308,7 +308,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
                   <button 
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition"
                   >
                     Next
                   </button>
@@ -316,7 +316,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-white/10 bg-zinc-900/40 px-6 py-16 text-center">
+            <div className="rounded-xl border border-dashed border-border-subtle bg-bg-panel/40 px-6 py-16 text-center">
               <p className="text-lg font-semibold text-text-primary">No problems match these filters</p>
               <p className="mt-1 text-sm text-text-secondary">
                 Remove a topic or difficulty to see more.

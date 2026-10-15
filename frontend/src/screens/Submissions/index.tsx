@@ -97,7 +97,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
   }, [allTopics, topicSearch]);
 
   return (
-    <div className="flex min-h-full flex-col bg-bg-app text-text-primary">
+    <div className="flex min-h-full flex-col bg-bg-void text-text-primary">
       <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -156,7 +156,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
                       className={`flex items-center justify-between gap-1 rounded-lg border px-3 py-2 text-sm transition-colors ${focusRing} ${
                         active
                           ? 'border-accent-primary/60 bg-accent-primary/10 text-text-primary'
-                          : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-white/20 hover:text-text-primary'
+                          : 'border-border-hairline bg-bg-panel-raised text-text-secondary hover:border-border-strong hover:text-text-primary'
                       }`}
                     >
                       <span className="flex items-center gap-2">
@@ -258,7 +258,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
                         <h2 className="text-xl font-semibold text-text-primary group-hover:text-accent-primary transition-colors flex items-center gap-2">
                           {problem?.title ?? 'Unknown Problem'}
                         </h2>
-                        {problem && <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'primary' : problem.difficulty === 'Hard' ? 'danger' : 'electric'} />}
+                        {problem && <Badge label={problem.difficulty} tone={problem.difficulty === 'Easy' ? 'easy' : problem.difficulty === 'Hard' ? 'danger' : 'warn'} />}
                       </div>
                       {!hideTags && (
                       <div className="flex flex-wrap gap-2">
@@ -286,11 +286,11 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
               </div>
               
               {true && (
-                <div className="mt-6 flex items-center justify-between rounded-xl border border-white/5 bg-bg-panel-raised px-4 py-3">
+                <div className="mt-6 flex items-center justify-between rounded-xl border border-border-subtle bg-bg-panel-raised px-4 py-3">
                   <button 
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition"
                   >
                     Previous
                   </button>
@@ -300,7 +300,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
                   <button 
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition"
+                    className="rounded border border-border-hairline px-3 py-1 text-xs text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg-hover transition"
                   >
                     Next
                   </button>
@@ -308,7 +308,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
               )}
               </>
             ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-zinc-900/40 px-6 py-16 text-center">
+              <div className="rounded-xl border border-dashed border-border-subtle bg-bg-panel/40 px-6 py-16 text-center">
                 <p className="text-lg font-semibold text-text-primary">No submissions match these filters</p>
                 <button
                   type="button"

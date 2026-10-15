@@ -7,9 +7,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ variant = 'primary', className = '', children, ...props }: ButtonProps) {
   const variantClassNames = {
-    primary: 'border border-accent-primary text-accent-fg bg-accent-primary shadow-glow hover:opacity-90 active:scale-[0.99] dark:bg-black dark:text-accent-primary dark:border-accent-primary dark:hover:shadow-glow-strong',
-    ghost: 'border border-border-hairline text-text-secondary bg-bg-panel hover:border-accent-primary hover:text-accent-primary hover:bg-bg-hover',
-    danger: 'border border-accent-danger text-accent-danger bg-bg-panel hover:bg-accent-danger/10',
+    primary: 'border border-accent-primary text-accent-strong dark:text-accent-primary bg-bg-panel dark:bg-black shadow-glow hover:shadow-glow-strong hover:bg-accent-tint/30 dark:hover:bg-accent-primary/10 active:scale-[0.99] font-bold',
+    ghost: 'border border-border-hairline text-text-secondary bg-bg-panel hover:border-accent-primary hover:text-accent-primary hover:bg-bg-hover active:scale-[0.99]',
+    danger: 'border border-accent-danger text-accent-danger bg-bg-panel hover:bg-accent-danger/10 active:scale-[0.99]',
   };
 
   return (

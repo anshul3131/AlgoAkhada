@@ -191,7 +191,7 @@ export function CustomLobbyScreen({
           <div className="flex flex-col items-center">
             <span className="text-[10px] uppercase tracking-[0.2em] text-text-secondary mb-1">JOIN CODE</span>
             <div 
-              className="relative font-mono text-2xl md:text-3xl font-black text-accent-electric tracking-[0.2em] cursor-pointer hover:text-white transition-colors group"
+              className="relative font-mono text-2xl md:text-3xl font-black text-accent-electric tracking-[0.2em] cursor-pointer hover:text-text-primary transition-colors group"
               onClick={() => {
                 navigator.clipboard.writeText(lobby.joinCode);
               }}
@@ -296,14 +296,14 @@ export function CustomLobbyScreen({
               <div className="flex gap-2">
                 <button 
                   onClick={toggleDeafen}
-                  className={`p-1.5 rounded transition ${isDeafened ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-white'}`}
+                  className={`p-1.5 rounded transition ${isDeafened ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-text-primary'}`}
                   title={isDeafened ? 'Undeafen' : 'Deafen'}
                 >
                   {isDeafened ? <VolumeX size={14} /> : <Volume2 size={14} />}
                 </button>
                 <button 
                   onClick={toggleMute}
-                  className={`p-1.5 rounded transition ${isMuted ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-white'}`}
+                  className={`p-1.5 rounded transition ${isMuted ? 'bg-accent-danger text-white' : 'bg-bg-void text-text-secondary hover:text-text-primary'}`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
                   {isMuted ? <MicOff size={14} /> : <Mic size={14} />}

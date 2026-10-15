@@ -35,10 +35,10 @@ export function AuthScreen({ onAuthenticated, login, signup, isLoading, error }:
       {/* ── Background: grid, colour washes, vignette ── */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div
-          className="absolute inset-0 opacity-[0.07]"
+          className="absolute inset-0 opacity-[0.05] dark:opacity-[0.07] text-text-primary"
           style={{
             backgroundImage:
-              'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
+              'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
             backgroundSize: '56px 56px',
             maskImage: 'radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%)',
             WebkitMaskImage: 'radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%)',
@@ -46,7 +46,7 @@ export function AuthScreen({ onAuthenticated, login, signup, isLoading, error }:
         />
         <div className="absolute -left-40 top-1/4 h-[36rem] w-[36rem] rounded-full bg-accent-primary/20 blur-[140px] motion-safe:animate-pulse" />
         <div className="absolute -right-32 bottom-0 h-[30rem] w-[30rem] rounded-full bg-accent-electric/20 blur-[140px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,#000_100%)]" />
+        <div className="absolute inset-0 bg-transparent dark:bg-[radial-gradient(ellipse_at_center,transparent_40%,#000_100%)]" />
       </div>
 
       {/* ── Brand side ── */}

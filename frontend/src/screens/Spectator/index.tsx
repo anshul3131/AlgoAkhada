@@ -4,6 +4,8 @@ import { Button } from '../../components/shared/Button';
 import { GlowPanel } from '../../components/shared/GlowPanel';
 import { useSocket, useRealtimeEvent } from '../../providers/RealtimeProvider';
 import { problemApi, type ProblemRecord } from '../../lib/api';
+import { useTheme } from '../../hooks/useTheme';
+import { registerThemes, editorOptions } from '../../utils/monacoThemes';
 import Editor from '@monaco-editor/react';
 
 interface SpectatorScreenProps {
@@ -68,6 +70,7 @@ export function SpectatorScreen({ matchId, problemId, players, onBack }: Spectat
     setSpectatorCount(count);
   });
 
+  const { isDark } = useTheme();
   const userIds = Object.keys(userCodes);
   const player1Id = userIds[0];
   const player2Id = userIds[1];
@@ -99,17 +102,16 @@ export function SpectatorScreen({ matchId, problemId, players, onBack }: Spectat
             </span>
             {player1Id && <Badge label={userCodes[player1Id].language} tone="primary" />}
           </div>
-          <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-[#1e1e1e] relative">
+          <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-bg-panel relative">
             <Editor
               height="100%"
-              theme="vs-dark"
+              beforeMount={registerThemes}
+              theme={isDark ? 'algo-dark' : 'algo-light'}
               language={player1Id ? (userCodes[player1Id].language === 'python' ? 'python' : userCodes[player1Id].language === 'cpp' ? 'cpp' : 'java') : 'cpp'}
               value={player1Id ? userCodes[player1Id].code : '// Waiting for code updates...'}
               options={{
+                ...editorOptions,
                 readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
               }}
             />
           </div>
@@ -123,17 +125,16 @@ export function SpectatorScreen({ matchId, problemId, players, onBack }: Spectat
             </span>
             {player2Id && <Badge label={userCodes[player2Id].language} tone="primary" />}
           </div>
-          <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-[#1e1e1e] relative">
+          <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-bg-panel relative">
             <Editor
               height="100%"
-              theme="vs-dark"
+              beforeMount={registerThemes}
+              theme={isDark ? 'algo-dark' : 'algo-light'}
               language={player2Id ? (userCodes[player2Id].language === 'python' ? 'python' : userCodes[player2Id].language === 'cpp' ? 'cpp' : 'java') : 'cpp'}
               value={player2Id ? userCodes[player2Id].code : '// Waiting for code updates...'}
               options={{
+                ...editorOptions,
                 readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
               }}
             />
           </div>
