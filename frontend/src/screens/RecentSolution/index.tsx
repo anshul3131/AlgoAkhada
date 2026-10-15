@@ -5,6 +5,7 @@ import { GlowPanel } from '../../components/shared/GlowPanel';
 import { submissionApi } from '../../lib/api';
 import type { SubmissionDetailRecord } from '../../types';
 import Editor from '@monaco-editor/react';
+import { useTheme } from '../../hooks/useTheme';
 
 export function RecentSolutionScreen({
   submissionId,
@@ -18,6 +19,7 @@ export function RecentSolutionScreen({
   const [submission, setSubmission] = useState<SubmissionDetailRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const loadSubmission = async () => {
@@ -90,11 +92,11 @@ export function RecentSolutionScreen({
                 Copy Code
               </Button>
             </div>
-            <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-[#1e1e1e] relative min-h-[400px]">
+            <div className="grow border border-border-hairline rounded-xl overflow-hidden bg-bg-panel relative min-h-[400px]">
               <Editor
                 height="100%"
                 language={submission.language === 'python' ? 'python' : submission.language === 'cpp' ? 'cpp' : 'java'}
-                theme="vs-dark"
+                theme={isDark ? 'vs-dark' : 'vs'}
                 value={submission.code}
                 options={{
                   readOnly: true,

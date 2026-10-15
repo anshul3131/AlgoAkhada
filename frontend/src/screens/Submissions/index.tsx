@@ -238,7 +238,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
           {/* ── Submission list ── */}
           <main className="min-w-0 flex-1">
             {loading ? (
-              <div className="rounded-xl border border-dashed border-white/10 bg-zinc-900/40 px-6 py-16 text-center text-text-secondary">Loading submissions...</div>
+              <div className="rounded-xl border border-dashed border-border-hairline bg-bg-panel/40 px-6 py-16 text-center text-text-secondary">Loading submissions...</div>
             ) : filtered.length > 0 ? (
               <>
               <div className="flex flex-col gap-3">
@@ -251,7 +251,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
                   <button
                     key={submission.id}
                     onClick={() => onReviewSolution(submission.id)}
-                    className="flex w-full flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur text-left transition-all hover:border-accent-primary/50 hover:bg-accent-primary/5 group"
+                    className="flex w-full flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between rounded-xl border border-border-subtle bg-bg-panel shadow-sm text-left transition-all hover:border-accent-primary/50 hover:bg-bg-hover group"
                   >
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">

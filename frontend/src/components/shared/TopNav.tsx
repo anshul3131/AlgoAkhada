@@ -1,5 +1,6 @@
 const logo = '/AlgoAkhada_logo.png';
 import { Badge } from './Badge';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
   username?: string;
@@ -69,6 +70,9 @@ export function TopNav({ username, avatarUrl, onDashboard, onHome, onProblems, o
           >
             Profile
           </button>
+          
+          <div className="w-px h-4 bg-border-hairline hidden sm:block"></div>
+          <ThemeToggle />
           
           {onLogout && (
             <>
