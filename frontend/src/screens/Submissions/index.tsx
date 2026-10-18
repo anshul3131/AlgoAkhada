@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { submissionApi, problemApi } from '../../lib/api';
+import { submissionApi } from '../../lib/api';
 import type { SubmissionListItem } from '../../types';
 import { Badge } from '../../components/shared/Badge';
 
@@ -21,20 +21,19 @@ const STATUS_DOT: Record<StatusFilter, string> = {
 
 export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) {
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    submissionApi.getSubmissions({ limit: 1000 })
-      .then(res => setSubmissions(res.items || []))
-      .finally(() => setLoading(false));
-      
-    problemApi.getTags().then(res => {
-        if(res.tags) setAllTags(res.tags);
+  const [totalMatched, setTotalMatched] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    STATUSES.forEach((s) => {
+      initial[s] = 0;
     });
-  }, []);
+    return initial;
+  });
+  const [topicCounts, setTopicCounts] = useState<Record<string, number>>({});
 
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statuses, setStatuses] = useState<StatusFilter[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [topicSearch, setTopicSearch] = useState('');
@@ -42,51 +41,83 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
+  // Fetch user submission metadata (status counts and topic counts) once on mount
+  useEffect(() => {
+    submissionApi
+      .getMetadata()
+      .then((res) => {
+        const nextCounts: Record<string, number> = {};
+        STATUSES.forEach((s) => {
+          nextCounts[s] = res.statusCounts?.[s] ?? 0;
+        });
+        setStatusCounts(nextCounts);
+        setTopicCounts(res.topicCounts ?? {});
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Debounce title search input and reset page to 1
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setCurrentPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  // Reset page to 1 whenever non-search filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statuses, topics]);
+
+  // Fetch current page of submissions from server using indexed filters
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    submissionApi
+      .getSubmissions({
+        page: currentPage,
+        limit: pageSize,
+        status: statuses.length > 0 ? statuses.join(',') : undefined,
+        topic: topics.length > 0 ? topics.join(',') : undefined,
+        search: debouncedQuery || undefined,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setSubmissions(res.items || []);
+        setTotalMatched(res.total ?? 0);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, pageSize, statuses, topics, debouncedQuery]);
+
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
   const allTopics = useMemo(() => {
-    const counts = new Map<string, number>();
-    submissions.forEach((s) => s.problem?.tags?.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [submissions]);
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    STATUSES.forEach(s => counts[s] = 0);
-    submissions.forEach((s) => {
-      if(counts[s.status] !== undefined) counts[s.status] += 1;
-    });
-    return counts;
-  }, [submissions]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return submissions.filter((s) => {
-      if (q && !s.problem?.title.toLowerCase().includes(q)) return false;
-      if (statuses.length && !statuses.includes(s.status as StatusFilter)) return false;
-      if (topics.length && !topics.every((t) => s.problem?.tags?.includes(t))) return false;
-      return true;
-    });
-  }, [submissions, query, statuses, topics]);
+    return Object.entries(topicCounts).sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    );
+  }, [topicCounts]);
 
   const hasFilters = query !== '' || statuses.length > 0 || topics.length > 0 || hideTags;
 
-  // Reset page to 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, statuses, topics]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = useMemo(() => {
-    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  }, [filtered, currentPage]);
+  const totalPages = Math.max(1, Math.ceil(totalMatched / pageSize));
+  const paginated = submissions;
 
   const clearAll = () => {
     setQuery('');
+    setDebouncedQuery('');
     setStatuses([]);
     setTopics([]);
     setHideTags(false);
+    setCurrentPage(1);
   };
 
   const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60";
@@ -107,7 +138,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
             </p>
           </div>
           <div className="text-sm font-mono text-text-secondary">
-            {filtered.length} {filtered.length === 1 ? 'submission' : 'submissions'} found
+            {totalMatched} {totalMatched === 1 ? 'submission' : 'submissions'} found
           </div>
         </header>
 
@@ -239,7 +270,7 @@ export function SubmissionsScreen({ onReviewSolution }: SubmissionsScreenProps) 
           <main className="min-w-0 flex-1">
             {loading ? (
               <div className="rounded-xl border border-dashed border-border-hairline bg-bg-panel/40 px-6 py-16 text-center text-text-secondary">Loading submissions...</div>
-            ) : filtered.length > 0 ? (
+            ) : paginated.length > 0 ? (
               <>
               <div className="flex flex-col gap-3">
                 {paginated.map((submission) => {

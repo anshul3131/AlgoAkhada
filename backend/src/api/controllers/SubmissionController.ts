@@ -63,6 +63,16 @@ export class SubmissionController {
         }
     }
 
+    @Get("/metadata")
+    public async getUserSubmissionMetadata(
+        @Req() req: any,
+        @Res() res: Response
+    ) {
+        const userId = req.user.id;
+        const serviceResponse = await this.submissionService.getUserSubmissionMetadata(userId);
+        return ResponseBuilder.send(res, serviceResponse);
+    }
+
     @Get()
     public async getUserSubmissions(
         @Req() req: any,
@@ -70,10 +80,11 @@ export class SubmissionController {
         @QueryParam("limit") limit: number,
         @QueryParam("status") status: string,
         @QueryParam("topic") topic: string,
+        @QueryParam("search") search: string,
         @Res() res: Response
     ) {
         const userId = req.user.id;
-        const serviceResponse = await this.submissionService.getUserSubmissions(userId, page, limit, status, topic);
+        const serviceResponse = await this.submissionService.getUserSubmissions(userId, page, limit, status, topic, search);
         return ResponseBuilder.send(res, serviceResponse);
     }
 

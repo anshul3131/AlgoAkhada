@@ -80,28 +80,36 @@ export class SubmissionService {
         }
     }
 
-    public async getUserSubmissions(userId: string, page: number, limit: number, status?: string, topic?: string): Promise<ResponseData> {
+    public async getUserSubmissionMetadata(userId: string): Promise<ResponseData> {
+        try {
+            const data = await this.submissionRepository.getUserSubmissionMetadata(userId);
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, 'SubmissionService', 'getUserSubmissionMetadata', { userId });
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    public async getUserSubmissions(
+        userId: string,
+        page: number,
+        limit: number,
+        status?: string,
+        topic?: string,
+        search?: string
+    ): Promise<ResponseData> {
         try {
             const pageNum = page ? Number(page) : DEFAULT_PAGE;
             const limitNum = limit ? Number(limit) : DEFAULT_PAGE_LIMIT;
 
-            const subRepo = AppDataSource.getRepository(Submission);
-            const query = subRepo.createQueryBuilder("submission")
-                .leftJoinAndSelect("submission.problem", "problem")
-                .where("submission.user.id = :userId", { userId })
-                .orderBy("submission.submittedAt", "DESC")
-                .skip((pageNum - 1) * limitNum)
-                .take(limitNum);
-
-            if (status) {
-                query.andWhere("submission.status = :status", { status });
-            }
-
-            if (topic) {
-                query.andWhere("problem.tags LIKE :topic", { topic: `%${topic}%` });
-            }
-
-            const [submissions, total] = await query.getManyAndCount();
+            const { submissions, total } = await this.submissionRepository.getUserSubmissions(
+                userId,
+                pageNum,
+                limitNum,
+                status,
+                topic,
+                search
+            );
 
             const items = submissions.map(s => ({
                 id: s.id,
@@ -122,7 +130,7 @@ export class SubmissionService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { items, total, page: pageNum, limit: limitNum });
         } catch (error: any) {
-            ErrorLoggingUtils.logError(error, 'SubmissionService', 'getUserSubmissions', { userId, page, limit });
+            ErrorLoggingUtils.logError(error, 'SubmissionService', 'getUserSubmissions', { userId, page, limit, status, topic, search });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }

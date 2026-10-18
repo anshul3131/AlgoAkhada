@@ -23,72 +23,114 @@ const DIFFICULTY_DOT: Record<Difficulty, string> = {
 export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
   const [problems, setProblems] = useState<ProblemListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalMatched, setTotalMatched] = useState(0);
+  const [totalCatalog, setTotalCatalog] = useState(0);
+  const [difficultyCounts, setDifficultyCounts] = useState<Record<Difficulty, number>>({
+    Easy: 0,
+    Medium: 0,
+    Hard: 0,
+  });
+  const [topicCounts, setTopicCounts] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    problemApi.getProblems({ limit: 1000 })
-      .then(res => setProblems(res.items || []))
-      .finally(() => setLoading(false));
-  }, []);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [difficulties, setDifficulties] = useState<Difficulty[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [topicSearch, setTopicSearch] = useState('');
   const [hideTags, setHideTags] = useState(false);
   const [hideSolved, setHideSolved] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 20;
+  const pageSize = 50;
+
+  // Fetch static problem metadata (total, difficulty counts, topic counts) once on mount
+  useEffect(() => {
+    problemApi
+      .getMetadata()
+      .then((res) => {
+        setTotalCatalog(res.total ?? 0);
+        setDifficultyCounts({
+          Easy: res.difficultyCounts?.Easy ?? 0,
+          Medium: res.difficultyCounts?.Medium ?? 0,
+          Hard: res.difficultyCounts?.Hard ?? 0,
+        });
+        setTopicCounts(res.topicCounts ?? {});
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Debounce title search input and reset page to 1
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setCurrentPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  // Reset page to 1 whenever non-search filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [difficulties, topics, hideSolved]);
+
+  // Fetch current page of problems from server using indexed filters
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    problemApi
+      .getProblems({
+        page: currentPage,
+        limit: pageSize,
+        difficulty: difficulties.length > 0 ? difficulties.join(',') : undefined,
+        search: debouncedQuery || undefined,
+        tag: topics.length > 0 ? topics.join(',') : undefined,
+        hideSolved: hideSolved || undefined,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setProblems(res.items || []);
+        setTotalMatched(res.total ?? 0);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, pageSize, difficulties, debouncedQuery, topics, hideSolved]);
 
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-  // Topic list with counts, most common first.
+  // Topic list with counts, most common first (from metadata endpoint).
   const allTopics = useMemo(() => {
-    const counts = new Map<string, number>();
-    problems.forEach((p) => p.tags?.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [problems]);
-
-  const difficultyCounts = useMemo(() => {
-    const counts: Record<Difficulty, number> = { Easy: 0, Medium: 0, Hard: 0 };
-    problems.forEach((p) => {
-      counts[p.difficulty] += 1;
-    });
-    return counts;
-  }, [problems]);
+    return Object.entries(topicCounts).sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    );
+  }, [topicCounts]);
 
   const visibleTopics = allTopics.filter(([t]) =>
     t.toLowerCase().includes(topicSearch.trim().toLowerCase()),
   );
 
-  // Difficulty: match any selected. Topics: problem must have every selected topic (Codeforces behaviour).
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return problems.filter((p) => {
-      if (q && !p.title.toLowerCase().includes(q)) return false;
-      if (difficulties.length && !difficulties.includes(p.difficulty)) return false;
-      if (hideSolved && p.isSolved) return false;
-      if (topics.length && !topics.every((t) => p.tags?.includes(t))) return false;
-      return true;
-    });
-  }, [problems, query, difficulties, topics, hideSolved]);
+  const hasFilters =
+    query !== '' ||
+    difficulties.length > 0 ||
+    topics.length > 0 ||
+    hideTags ||
+    hideSolved;
 
-  const hasFilters = query !== '' || difficulties.length > 0 || topics.length > 0 || hideTags || hideSolved;
-
-  // Reset page to 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, difficulties, topics, hideSolved]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = useMemo(() => {
-    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  }, [filtered, currentPage]);
+  const totalPages = Math.max(1, Math.ceil(totalMatched / pageSize));
+  const paginated = problems;
 
   const clearAll = () => {
     setQuery('');
+    setDebouncedQuery('');
     setDifficulties([]);
     setTopics([]);
     setTopicSearch('');
+    setCurrentPage(1);
   };
 
   const focusRing =
@@ -104,8 +146,8 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
           </p>
         </div>
         <p className="text-sm text-text-secondary" aria-live="polite">
-          <span className="font-semibold text-text-primary">{filtered.length}</span> of{' '}
-          {problems.length} problems
+          <span className="font-semibold text-text-primary">{totalMatched}</span> of{' '}
+          {totalCatalog || totalMatched} problems
         </p>
       </header>
 
@@ -254,7 +296,7 @@ export function ProblemsScreen({ onSolveProblem }: ProblemsScreenProps) {
         <main className="min-w-0 flex-1">
           {loading ? (
             <div className="rounded-xl border border-dashed border-border-hairline bg-bg-panel/40 px-6 py-16 text-center text-text-secondary">Loading problems...</div>
-          ) : filtered.length > 0 ? (
+          ) : paginated.length > 0 ? (
             <>
             <div className="flex flex-col gap-3">
               {paginated.map((problem) => (

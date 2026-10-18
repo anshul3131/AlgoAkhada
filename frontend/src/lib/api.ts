@@ -149,13 +149,28 @@ export const userApi = {
 export const problemApi = {
   getTags: () => request<{ tags: string[] }>('/problems/tags'),
 
-  getProblems: (params?: { page?: number; limit?: number; difficulty?: string; search?: string; tag?: string }) => {
+  getMetadata: () =>
+    request<{
+      total: number;
+      difficultyCounts: Record<string, number>;
+      topicCounts: Record<string, number>;
+    }>('/problems/metadata'),
+
+  getProblems: (params?: {
+    page?: number;
+    limit?: number;
+    difficulty?: string;
+    search?: string;
+    tag?: string;
+    hideSolved?: boolean;
+  }) => {
     const query = new URLSearchParams();
     if (params?.page) query.append("page", String(params.page));
     if (params?.limit) query.append("limit", String(params.limit));
     if (params?.difficulty) query.append("difficulty", params.difficulty);
     if (params?.search) query.append("search", params.search);
     if (params?.tag) query.append("tag", params.tag);
+    if (params?.hideSolved) query.append("hideSolved", "true");
     return request<{ items: ProblemListItem[]; page: number; limit: number; total: number }>(`/problems?${query.toString()}`);
   },
   getProblemsByTag: (tag: string, page = 1, limit = 20) => {
@@ -172,13 +187,26 @@ export const matchApi = {
 };
 
 export const submissionApi = {
+  getMetadata: () =>
+    request<{
+      total: number;
+      statusCounts: Record<string, number>;
+      topicCounts: Record<string, number>;
+    }>('/submissions/metadata'),
 
-  getSubmissions: (params?: { page?: number; limit?: number; status?: string; topic?: string }) => {
+  getSubmissions: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    topic?: string;
+    search?: string;
+  }) => {
     const query = new URLSearchParams();
     if (params?.page) query.append("page", String(params.page));
     if (params?.limit) query.append("limit", String(params.limit));
     if (params?.status) query.append("status", params.status);
     if (params?.topic) query.append("topic", params.topic);
+    if (params?.search) query.append("search", params.search);
     return request<SubmissionListResponse>(`/submissions?${query.toString()}`);
   },
   getSubmission: (submissionId: string) => request<SubmissionDetailRecord>(`/submissions/${submissionId}`),
@@ -223,8 +251,18 @@ export interface ExecutionResponse {
   }[];
 }
 
+let cachedLanguagesPromise: Promise<LanguageRecord[]> | null = null;
+
 export const executionApi = {
-  getLanguages: () => request<LanguageRecord[]>('/languages'),
+  getLanguages: () => {
+    if (!cachedLanguagesPromise) {
+      cachedLanguagesPromise = request<LanguageRecord[]>('/languages').catch((err) => {
+        cachedLanguagesPromise = null;
+        throw err;
+      });
+    }
+    return cachedLanguagesPromise;
+  },
   executeCode: (payload: {
     problemId?: string;
     language: string;

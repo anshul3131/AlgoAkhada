@@ -92,6 +92,14 @@ export class RedisKeys {
     }
 
     /**
+     * Key for cached problem metadata (total, difficulty counts, topic counts)
+     * Example: problem_metadata
+     */
+    public static getProblemMetadataKey(): string {
+        return `problem_metadata`;
+    }
+
+    /**
      * Key for cached static problem details (statement, difficulty, tags, samples)
      * Example: problem:details:uuid
      */

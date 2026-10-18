@@ -44,6 +44,12 @@ export class ProblemController {
         return ResponseBuilder.send(res, serviceResponse);
     }
 
+    @Get("/metadata")
+    public async getMetadata(@Res() res: Response) {
+        const serviceResponse = await this.problemService.getProblemMetadata();
+        return ResponseBuilder.send(res, serviceResponse);
+    }
+
     @Get()
     public async getAllProblems(
         @QueryParam("page") page: number,
@@ -51,11 +57,12 @@ export class ProblemController {
         @QueryParam("difficulty") difficulty: string,
         @QueryParam("search") search: string,
         @QueryParam("tag") tag: string,
+        @QueryParam("hideSolved") hideSolved: boolean,
         @Req() req: any,
         @Res() res: Response
     ) {
         const userId = req.user?.id;
-        const serviceResponse = await this.problemService.getAllProblems(page, limit, difficulty, search, tag, userId);
+        const serviceResponse = await this.problemService.getAllProblems(page, limit, difficulty, search, tag, userId, hideSolved);
         return ResponseBuilder.send(res, serviceResponse);
     }
 

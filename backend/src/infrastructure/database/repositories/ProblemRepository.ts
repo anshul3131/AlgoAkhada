@@ -8,7 +8,9 @@
 import { Repository, QueryRunner } from "typeorm";
 import { Service } from "typedi";
 import { Problem } from "../../../domain/entities/Problem";
+import { SubmissionStatus } from "../../../domain/entities/Submission";
 import { AppDataSource } from "../data_source";
+import { COMMA } from "../../../constants/AppConstant";
 
 @Service()
 export class ProblemRepository extends Repository<Problem> {
@@ -34,7 +36,15 @@ export class ProblemRepository extends Repository<Problem> {
             .getOne();
     }
 
-    async getAllProblems(page: number, limit: number, difficulty: string, search?: string, tag?: string) {
+    async getAllProblems(
+        page: number,
+        limit: number,
+        difficulty?: string,
+        search?: string,
+        tag?: string,
+        hideSolved?: boolean,
+        userId?: string
+    ) {
         const query = this.createQueryBuilder("problem");
 
         // Projection Pruning: select only lightweight columns needed for list view, omitting large problem.description
@@ -48,28 +58,58 @@ export class ProblemRepository extends Repository<Problem> {
             "problem.createdAt"
         ]);
 
-        // Format difficulty to match Enum (e.g., 'medium' -> 'Medium')
+        // Format difficulty to match Enum (supports single 'Easy' or comma-separated 'Easy,Medium')
         if (difficulty) {
-            const normalizedDifficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
-            query.andWhere("problem.difficulty = :difficulty", { difficulty: normalizedDifficulty });
+            const normalizedDifficulties = difficulty
+                .split(COMMA)
+                .map(d => d.trim())
+                .filter(Boolean)
+                .map(d => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase());
+
+            if (normalizedDifficulties.length === 1) {
+                query.andWhere("problem.difficulty = :difficulty", { difficulty: normalizedDifficulties[0] });
+            } else if (normalizedDifficulties.length > 1) {
+                query.andWhere("problem.difficulty IN (:...difficulties)", { difficulties: normalizedDifficulties });
+            }
         }
 
-        // Search by prefix if provided (case-insensitive prefix search utilizing index)
-        if (search) {
-            query.andWhere("lower(problem.title) LIKE :search", { search: `${search.toLowerCase()}%` });
+        // Search by prefix if provided (case-insensitive prefix search utilizing idx_problems_title_lower)
+        if (search && search.trim()) {
+            query.andWhere("lower(problem.title) LIKE :search", { search: `${search.trim().toLowerCase()}%` });
         }
 
-        // Filter by specific tag if provided
-        if (tag) {
-            query.andWhere(":tag = ANY(problem.tags)", { tag });
+        // Filter by specific tag(s) if provided using @> array containment so PostgreSQL uses idx_problems_tags_gin
+        const tagList = tag
+            ? tag.split(COMMA).map(t => t.trim()).filter(Boolean)
+            : [];
+        if (tagList.length > 0) {
+            query.andWhere("problem.tags @> :tags", { tags: tagList });
         }
 
-        // Prioritize problems with non-empty tags over problems with empty or null tags
-        query.orderBy(
-            "CASE WHEN problem.tags IS NOT NULL AND cardinality(problem.tags) > 0 THEN 0 ELSE 1 END",
-            "ASC"
-        );
-        query.addOrderBy("problem.createdAt", "DESC");
+        // Exclude solved problems when hideSolved is enabled for an authenticated user
+        if (hideSolved && userId) {
+            query.andWhere(
+                `NOT EXISTS (
+                    SELECT 1 FROM submissions s
+                    WHERE s.problem_id = problem.id
+                      AND s.user_id = :userId
+                      AND s.status = :acceptedStatus
+                )`,
+                { userId, acceptedStatus: SubmissionStatus.ACCEPTED }
+            );
+        }
+
+        // Ordering: when filtering by tag(s), all matched rows already have tags so we can sort directly by createdAt DESC;
+        // otherwise prioritize tagged problems first or sort by createdAt DESC
+        if (tagList.length === 0) {
+            query.orderBy(
+                "CASE WHEN problem.tags IS NOT NULL AND cardinality(problem.tags) > 0 THEN 0 ELSE 1 END",
+                "ASC"
+            );
+            query.addOrderBy("problem.createdAt", "DESC");
+        } else {
+            query.orderBy("problem.createdAt", "DESC");
+        }
 
         // Pagination
         query.skip((page - 1) * limit).take(limit);
@@ -82,6 +122,42 @@ export class ProblemRepository extends Repository<Problem> {
             page,
             limit,
             totalPages: Math.ceil(total / limit)
+        };
+    }
+
+    async getProblemMetadata() {
+        const difficultyRows = await this.createQueryBuilder("problem")
+            .select("problem.difficulty", "difficulty")
+            .addSelect("COUNT(*)::int", "count")
+            .groupBy("problem.difficulty")
+            .getRawMany<{ difficulty: string; count: number }>();
+
+        const topicRows: Array<{ tag: string; count: number }> = await AppDataSource.query(
+            `SELECT tag, COUNT(*)::int AS count
+             FROM problems, unnest(tags) AS tag
+             GROUP BY tag
+             ORDER BY count DESC, tag ASC`
+        );
+
+        const difficultyCounts: Record<string, number> = { Easy: 0, Medium: 0, Hard: 0 };
+        let total = 0;
+        for (const row of difficultyRows) {
+            const count = Number(row.count) || 0;
+            difficultyCounts[row.difficulty] = count;
+            total += count;
+        }
+
+        const topicCounts: Record<string, number> = {};
+        for (const row of topicRows) {
+            if (row.tag) {
+                topicCounts[row.tag] = Number(row.count) || 0;
+            }
+        }
+
+        return {
+            total,
+            difficultyCounts,
+            topicCounts
         };
     }
 

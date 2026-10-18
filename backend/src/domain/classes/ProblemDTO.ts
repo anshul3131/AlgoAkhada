@@ -43,3 +43,10 @@ export class ProblemListResponseDTO {
 export class TagsResponseDTO {
     tags: string[];
 }
+
+export class ProblemMetadataResponseDTO {
+    total: number;
+    difficultyCounts: Record<string, number>;
+    topicCounts: Record<string, number>;
+}
+

@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from "typeorm";
 import { Problem } from "./Problem";
 
 @Entity("test_cases")
+@Index("idx_test_cases_problem_hidden", ["problem", "isHidden"])
 export class TestCase {
     @PrimaryGeneratedColumn("uuid")
     id: string;

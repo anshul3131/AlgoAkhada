@@ -15,7 +15,7 @@ import { In } from "typeorm";
 import { TestCase } from "../entities/TestCase";
 import { ProblemTag } from "../enums/ProblemTag";
 import { ResponseData, RESPONSE_CODES, RESPONSE_MESSAGES } from "../classes/ResponseDTO";
-import { ProblemDetailDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
+import { ProblemDetailDTO, ProblemMetadataResponseDTO, ProblemSampleDTO, TagsResponseDTO } from "../classes/ProblemDTO";
 import { ProblemFormatter } from "../../utils/ProblemFormatter";
 import { redisCache } from "../../infrastructure/redis/RedisCache";
 import { RedisKeys } from "../../infrastructure/redis/RedisConstants";
@@ -47,6 +47,11 @@ export class ProblemService {
             problemData.memoryLimit = memoryLimit || DEFAULT_MEMORY_LIMIT_MB;
             
             const saved = await this.problemRepository.saveEntity(problemData);
+            try {
+                await redisCache.del(RedisKeys.getProblemMetadataKey());
+            } catch (cacheErr: any) {
+                logger.warn(`[ProblemService] Redis del metadata failed: ${cacheErr.message}`);
+            }
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, saved);
         } catch (error: any) {
             ErrorLoggingUtils.logError(error, 'ProblemService', 'createProblem', { title });
@@ -81,30 +86,59 @@ export class ProblemService {
         }
     }
 
-    public async getAllProblems(page: number, limit: number, difficulty: string, search: string, tag: string, userId?: string): Promise<ResponseData> {
+    public async getProblemMetadata(): Promise<ResponseData> {
+        try {
+            const cacheKey = RedisKeys.getProblemMetadataKey();
+            try {
+                const cached = await redisCache.get<ProblemMetadataResponseDTO>(cacheKey);
+                if (cached) {
+                    return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, cached);
+                }
+            } catch (cacheErr: any) {
+                logger.warn(`[ProblemService] Redis get metadata failed: ${cacheErr.message}`);
+            }
+
+            const data: ProblemMetadataResponseDTO = await this.problemRepository.getProblemMetadata();
+
+            try {
+                await redisCache.set(cacheKey, data, { EX: cacheExpirySeconds.ONE_HOUR });
+            } catch (cacheErr: any) {
+                logger.warn(`[ProblemService] Redis set metadata failed: ${cacheErr.message}`);
+            }
+
+            return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, data);
+        } catch (error: any) {
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'getProblemMetadata');
+            return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
+        }
+    }
+
+    public async getAllProblems(
+        page: number,
+        limit: number,
+        difficulty: string,
+        search: string,
+        tag: string,
+        userId?: string,
+        hideSolved?: boolean
+    ): Promise<ResponseData> {
         try {
             const pageNum = page ? Number(page) : DEFAULT_PAGE;
             const limitNum = limit ? Number(limit) : DEFAULT_PAGE_LIMIT;
 
-            const result = await this.problemRepository.getAllProblems(pageNum, limitNum, difficulty, search, tag);
+            const result = await this.problemRepository.getAllProblems(pageNum, limitNum, difficulty, search, tag, hideSolved, userId);
             
             let solvedProblemIds = new Set<string>();
-            if (userId && result.problems.length > 0) {
+            if (userId && !hideSolved && result.problems.length > 0) {
                 const pageProblemIds = result.problems.map(p => p.id);
-                const subRepo = AppDataSource.getRepository(Submission);
-                const solvedSubs = await subRepo.find({
-                    where: { 
-                        user: { id: userId }, 
-                        status: SubmissionStatus.ACCEPTED,
-                        problem: { id: In(pageProblemIds) }
-                    },
-                    select: { 
-                        id: true,
-                        problem: { id: true }
-                    },
-                    relations: { problem: true }
-                });
-                solvedProblemIds = new Set(solvedSubs.map(s => s.problem.id));
+                const solvedRows = await AppDataSource.getRepository(Submission)
+                    .createQueryBuilder("submission")
+                    .select("DISTINCT submission.problem_id", "problemId")
+                    .where("submission.user_id = :userId", { userId })
+                    .andWhere("submission.status = :status", { status: SubmissionStatus.ACCEPTED })
+                    .andWhere("submission.problem_id IN (:...pageProblemIds)", { pageProblemIds })
+                    .getRawMany<{ problemId: string }>();
+                solvedProblemIds = new Set(solvedRows.map(s => s.problemId));
             }
 
             const responsePayload: any = {
@@ -124,7 +158,7 @@ export class ProblemService {
 
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, responsePayload);
         } catch (error: any) {
-            ErrorLoggingUtils.logError(error, 'ProblemService', 'getAllProblems', { page, limit, difficulty, search, tag });
+            ErrorLoggingUtils.logError(error, 'ProblemService', 'getAllProblems', { page, limit, difficulty, search, tag, hideSolved });
             return ResponseData.build(RESPONSE_CODES.FAILURE, RESPONSE_MESSAGES.SOMETHING_WENT_WRONG);
         }
     }
@@ -132,13 +166,19 @@ export class ProblemService {
     public async getProblemDetails(id: string, userId?: string): Promise<ResponseData> {
         try {
             const cacheKey = RedisKeys.getProblemDetailsKey(id);
-            let staticPayload: ProblemDetailDTO | null = null;
 
-            try {
-                staticPayload = await redisCache.get<ProblemDetailDTO>(cacheKey);
-            } catch (cacheErr: any) {
-                logger.warn(`Redis getProblemDetails cache lookup failed for ${id}: ${cacheErr.message}`);
-            }
+            // Run Redis cache lookup and user's past submissions query in parallel
+            const [cachedStaticPayload, pastSubs] = await Promise.all([
+                redisCache.get<ProblemDetailDTO>(cacheKey).catch((cacheErr: any) => {
+                    logger.warn(`Redis getProblemDetails cache lookup failed for ${id}: ${cacheErr.message}`);
+                    return null;
+                }),
+                userId
+                    ? this.submissionRepository.getUserProblemSubmissions(id, userId)
+                    : Promise.resolve([])
+            ]);
+
+            let staticPayload: ProblemDetailDTO | null = cachedStaticPayload;
 
             if (!staticPayload) {
                 const problem = await this.problemRepository.getProblemWithSamples(id);
@@ -175,19 +215,19 @@ export class ProblemService {
 
             const payload: ProblemDetailDTO = { ...staticPayload };
 
-            if (userId) {
-                const subRepo = AppDataSource.getRepository(Submission);
-                const pastSubs = await subRepo.find({
-                    where: { problem: { id }, user: { id: userId } },
-                    order: { submittedAt: 'DESC' },
-                    select: { id: true, status: true, language: true, submittedAt: true, executionTimeMs: true }
-                });
-                if (pastSubs.length > 0) {
-                    payload.pastSubmissions = pastSubs;
-                }
-                const sub = await this.submissionRepository.getLastAcceptedSubmission(id, userId);
-                if (sub) {
-                    payload.lastSubmission = { code: sub.code, language: sub.language };
+            if (userId && pastSubs.length > 0) {
+                payload.pastSubmissions = pastSubs;
+
+                // Only query the code column if the user actually has an Accepted submission, using its primary key
+                const latestAccepted = pastSubs.find(s => s.status === SubmissionStatus.ACCEPTED);
+                if (latestAccepted) {
+                    const subWithCode = await this.submissionRepository.getSubmissionCodeById(latestAccepted.id);
+                    if (subWithCode) {
+                        payload.lastSubmission = {
+                            code: subWithCode.code,
+                            language: subWithCode.language
+                        };
+                    }
                 }
             }
 
@@ -234,6 +274,11 @@ export class ProblemService {
             }
 
             await queryRunner.commitTransaction();
+            try {
+                await redisCache.del(RedisKeys.getProblemMetadataKey());
+            } catch (cacheErr: any) {
+                logger.warn(`[ProblemService] Redis del metadata after bulk upload failed: ${cacheErr.message}`);
+            }
             return ResponseData.build(RESPONSE_CODES.SUCCESS_HTTP_CODE, RESPONSE_MESSAGES.SUCCESS, { problemsAdded, testCasesAdded });
         } catch (error: any) {
             await queryRunner.rollbackTransaction();
